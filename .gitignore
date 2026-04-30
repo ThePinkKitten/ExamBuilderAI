@@ -1,0 +1,20 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+**/node_modules/
+**/dist/
+**/.angular/
+**/out-tsc/
+
+# .NET
+**/bin/
+**/obj/
+**/TestResults/
+
+# Logs
+**/*.log
+
+# Secrets (environment-specific settings)
+backend/appsettings.*.json
