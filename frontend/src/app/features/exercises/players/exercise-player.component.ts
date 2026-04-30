@@ -22,7 +22,7 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
       @if (loading()) {
         <div class="loading-center">
           <mat-spinner diameter="48"></mat-spinner>
-          <p>Đang tải bài tập...</p>
+          <p>Loading exercise...</p>
         </div>
       } @else if (exercise()) {
         <div class="exercise-header animate-fade-in">
@@ -38,7 +38,7 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
               <span class="difficulty-badge" [attr.data-level]="exercise()!.difficulty">
                 {{ exercise()!.difficulty }}
               </span>
-              · {{ exercise()!.questionCount }} câu hỏi
+              · {{ exercise()!.questionCount }} questions
             </p>
           </div>
           <div class="timer">
@@ -81,7 +81,7 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
       @if (submitting()) {
         <div class="submit-overlay">
           <mat-spinner diameter="40"></mat-spinner>
-          <p>Đang chấm điểm...</p>
+          <p>Grading...</p>
         </div>
       }
     </div>

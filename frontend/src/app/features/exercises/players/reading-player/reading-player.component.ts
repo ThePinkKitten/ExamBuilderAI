@@ -20,7 +20,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
         @for (q of exercise.questions.questions; track q.id; let i = $index) {
           <div class="question-card glass-card animate-slide-in"
                [style.animation-delay]="(i * 0.1) + 's'">
-            <div class="question-number">Câu {{ q.id }}</div>
+            <div class="question-number">Question {{ q.id }}</div>
 
             @if (q.type === 'true_false') {
               <p class="question-text">{{ q.statement }}</p>
@@ -44,7 +44,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
         <button class="accent-btn submit-btn" (click)="onSubmit()"
                 [disabled]="!allAnswered()">
           <mat-icon>send</mat-icon>
-          Nộp bài ({{ answeredCount() }}/{{ exercise.questions.questions.length }})
+          Submit ({{ answeredCount() }}/{{ exercise.questions.questions.length }})
         </button>
       </div>
     </div>

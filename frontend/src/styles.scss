@@ -2,11 +2,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
 
 // === Custom Theme ===
-$dark-theme: mat.define-theme((
+$sakura-theme: mat.define-theme((
   color: (
-    theme-type: dark,
-    primary: mat.$violet-palette,
-    tertiary: mat.$cyan-palette,
+    theme-type: light,
+    primary: mat.$rose-palette,
+    tertiary: mat.$red-palette,
   ),
   typography: (
     brand-family: 'Be Vietnam Pro',
@@ -16,27 +16,27 @@ $dark-theme: mat.define-theme((
 ));
 
 :root {
-  --bg-primary: #0f0f1a;
-  --bg-secondary: #1a1a2e;
-  --bg-card: #16213e;
-  --bg-card-hover: #1e2d4a;
-  --accent-primary: #7c3aed;
-  --accent-secondary: #06b6d4;
-  --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --success: #22c55e;
-  --danger: #ef4444;
+  --bg-primary: #fbf7fa;
+  --bg-secondary: #f6e7ef;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fff3f8;
+  --accent-primary: #e11d48;
+  --accent-secondary: #fb7185;
+  --accent-gradient: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --success: #16a34a;
+  --danger: #dc2626;
   --warning: #f59e0b;
-  --border: rgba(148, 163, 184, 0.1);
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --border: rgba(15, 23, 42, 0.08);
+  --shadow: 0 10px 30px rgba(225, 29, 72, 0.12);
   --radius: 12px;
   --radius-lg: 16px;
 }
 
 html {
-  @include mat.all-component-themes($dark-theme);
+  @include mat.all-component-themes($sakura-theme);
 }
 
 * {
@@ -48,7 +48,10 @@ html {
 html, body {
   height: 100%;
   font-family: 'Be Vietnam Pro', sans-serif;
-  background: var(--bg-primary);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(251, 113, 133, 0.28), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(225, 29, 72, 0.18), transparent 55%),
+    var(--bg-primary);
   color: var(--text-primary);
   overflow-x: hidden;
 }
@@ -69,7 +72,7 @@ html, body {
 }
 
 .glass-card {
-  background: rgba(22, 33, 62, 0.8);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -77,8 +80,8 @@ html, body {
   transition: all 0.3s ease;
 
   &:hover {
-    border-color: rgba(124, 58, 237, 0.3);
-    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.1);
+    border-color: rgba(225, 29, 72, 0.25);
+    box-shadow: 0 12px 32px rgba(225, 29, 72, 0.12);
   }
 }
 
@@ -99,10 +102,11 @@ html, body {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
+  box-shadow: 0 8px 18px rgba(225, 29, 72, 0.25);
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+    box-shadow: 0 12px 28px rgba(225, 29, 72, 0.35);
   }
 
   &:disabled {

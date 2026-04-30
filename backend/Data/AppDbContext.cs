@@ -85,7 +85,7 @@ public class AppDbContext : DbContext
 
     private static void SeedCurriculumUnits(ModelBuilder modelBuilder)
     {
-        // Tiếng Anh 8 Global Success — 12 Units
+        // Grade 8 English Global Success - 12 Units
         modelBuilder.Entity<CurriculumUnit>().HasData(
             new CurriculumUnit
             {

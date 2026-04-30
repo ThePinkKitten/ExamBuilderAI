@@ -110,6 +110,37 @@ public class ExerciseController : ControllerBase
     }
 
     /// <summary>
+    /// Generate a new exercise using Server-Sent Events (SSE).
+    /// </summary>
+    [HttpPost("generate-stream")]
+    public async Task GenerateStream([FromBody] GenerateExerciseRequest request)
+    {
+        var userId = GetUserId();
+
+        Response.ContentType = "text/event-stream";
+        Response.Headers.Append("Cache-Control", "no-cache");
+        Response.Headers.Append("Connection", "keep-alive");
+
+        // Send an empty event or comment to force HTTP 200 headers immediately.
+        await Response.WriteAsync(": connected\n\n");
+        await Response.Body.FlushAsync();
+
+        var stream = _generator.GenerateStreamAsync(
+            request.SectionCode,
+            request.CurriculumUnitId,
+            request.QuestionCount,
+            request.Difficulty,
+            userId
+        );
+
+        await foreach (var evt in stream)
+        {
+            await Response.WriteAsync($"data: {evt}\n\n");
+            await Response.Body.FlushAsync();
+        }
+    }
+
+    /// <summary>
     /// Get an exercise by ID. Returns questions only if not yet submitted.
     /// </summary>
     [HttpGet("{id}")]

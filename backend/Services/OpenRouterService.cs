@@ -146,6 +146,90 @@ public class OpenRouterService
     }
 
     /// <summary>
+    /// Send a chat completion request with stream: true and yield tokens as they arrive.
+    /// </summary>
+    public async IAsyncEnumerable<string> ChatCompletionStreamAsync(string systemPrompt, string userPrompt)
+    {
+        var model = _config["OpenRouter:Model"] ?? "google/gemini-2.0-flash-exp:free";
+        var apiKey = _config["OpenRouter:ApiKey"] ?? throw new InvalidOperationException("OpenRouter:ApiKey is not configured");
+
+        var requestBody = new Dictionary<string, object>
+        {
+            ["model"] = model,
+            ["messages"] = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt }
+            },
+            ["temperature"] = 0.7,
+            ["max_tokens"] = 4096,
+            ["stream"] = true
+        };
+
+        var json = JsonSerializer.Serialize(requestBody, JsonOptions);
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        request.Headers.Add("Authorization", $"Bearer {apiKey}");
+        request.Headers.Add("HTTP-Referer", "https://exambuilder-ai.local");
+        request.Headers.Add("X-Title", "ExamBuilder AI");
+
+        // Use ResponseHeadersRead to process the response stream immediately
+        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("OpenRouter Stream API error: {StatusCode} - {Content}", response.StatusCode, errorContent);
+            yield break;
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream);
+
+        string? line;
+        while ((line = await reader.ReadLineAsync()) != null)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            if (line.StartsWith("data: "))
+            {
+                var data = line.Substring(6).Trim();
+                if (data == "[DONE]") break;
+
+                string? contentToYield = null;
+                try
+                {
+                    using var doc = JsonDocument.Parse(data);
+                    if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                    {
+                        var delta = choices[0].GetProperty("delta");
+                        if (delta.TryGetProperty("content", out var contentElement))
+                        {
+                            var content = contentElement.GetString();
+                            if (!string.IsNullOrEmpty(content))
+                            {
+                                contentToYield = content;
+                            }
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Ignore malformed JSON chunks
+                }
+
+                if (contentToYield != null)
+                {
+                    yield return contentToYield;
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Send a vision request with an image (base64) for exam image analysis.
     /// </summary>
     public async Task<string?> VisionCompletionAsync(string systemPrompt, string userPrompt, string base64Image, string mimeType = "image/jpeg")

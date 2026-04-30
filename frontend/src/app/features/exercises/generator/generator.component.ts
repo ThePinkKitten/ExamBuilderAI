@@ -23,13 +23,13 @@ import { SectionInfo, CurriculumUnitInfo } from '../../../shared/models/api.mode
         </button>
         <div>
           <h1 class="gradient-text">Generate Exercise</h1>
-          <p>Chọn cấu hình và để AI tạo bài tập cho bạn</p>
+          <p>Choose settings and let AI generate an exercise for you</p>
         </div>
       </div>
 
       <div class="generator-form glass-card animate-fade-in">
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Dạng bài tập</mat-label>
+          <mat-label>Exercise type</mat-label>
           <mat-select [(ngModel)]="selectedSection" name="section">
             @for (s of sections(); track s.code) {
               <mat-option [value]="s.code">
@@ -41,9 +41,9 @@ import { SectionInfo, CurriculumUnitInfo } from '../../../shared/models/api.mode
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Unit (tuỳ chọn)</mat-label>
+          <mat-label>Unit (optional)</mat-label>
           <mat-select [(ngModel)]="selectedUnit" name="unit">
-            <mat-option [value]="null">Tất cả Units (random)</mat-option>
+            <mat-option [value]="null">All units (random)</mat-option>
             @for (u of units(); track u.id) {
               <mat-option [value]="u.id">
                 Unit {{ u.unitNumber }}: {{ u.unitTitle }}
@@ -55,17 +55,18 @@ import { SectionInfo, CurriculumUnitInfo } from '../../../shared/models/api.mode
 
         <div class="form-row">
           <mat-form-field appearance="outline">
-            <mat-label>Số câu hỏi</mat-label>
+            <mat-label>Number of questions</mat-label>
             <mat-select [(ngModel)]="questionCount" name="count">
-              <mat-option [value]="3">3 câu</mat-option>
-              <mat-option [value]="5">5 câu</mat-option>
-              <mat-option [value]="8">8 câu</mat-option>
-              <mat-option [value]="10">10 câu</mat-option>
+              <mat-option [value]="1">1 question</mat-option>
+              <mat-option [value]="3">3 questions</mat-option>
+              <mat-option [value]="5">5 questions</mat-option>
+              <mat-option [value]="8">8 questions</mat-option>
+              <mat-option [value]="10">10 questions</mat-option>
             </mat-select>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Độ khó</mat-label>
+            <mat-label>Difficulty</mat-label>
             <mat-select [(ngModel)]="difficulty" name="difficulty">
               <mat-option value="easy">🟢 Easy</mat-option>
               <mat-option value="medium">🟡 Medium</mat-option>
@@ -78,7 +79,7 @@ import { SectionInfo, CurriculumUnitInfo } from '../../../shared/models/api.mode
                 [disabled]="generating() || !selectedSection">
           @if (generating()) {
             <mat-spinner diameter="20"></mat-spinner>
-            <span>AI đang tạo bài tập...</span>
+            <span>AI is thinking (about 10-15s)...</span>
           } @else {
             <mat-icon>auto_awesome</mat-icon>
             <span>Generate Exercise</span>
@@ -187,7 +188,7 @@ export class GeneratorComponent implements OnInit {
       },
       error: (err) => {
         this.generating.set(false);
-        this.error.set(err.error?.message || 'Không thể tạo bài tập. Vui lòng thử lại.');
+        this.error.set(err.error?.message || 'Unable to generate the exercise. Please try again.');
       }
     });
   }

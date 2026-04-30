@@ -34,7 +34,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ExerciseGeneratorService>();
 builder.Services.AddScoped<ExerciseGradingService>();
-builder.Services.AddHttpClient<OpenRouterService>();
+builder.Services.AddHttpClient<OpenRouterService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(150);
+});
 
 // === CORS (allow Angular dev server) ===
 builder.Services.AddCors(options =>

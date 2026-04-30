@@ -18,7 +18,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
         @for (blank of exercise.questions.blanks; track blank.id) {
           <div class="blank-item">
             <span class="blank-label">({{ blank.id }})</span>
-            <mat-select [(ngModel)]="answers[blank.id]" placeholder="Chọn đáp án"
+            <mat-select [(ngModel)]="answers[blank.id]" placeholder="Choose an answer"
                         class="blank-select">
               @for (opt of blank.options; track $index) {
                 <mat-option [value]="$index">
@@ -34,7 +34,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
     <button class="accent-btn submit-btn" (click)="onSubmit()"
             [disabled]="!allAnswered()">
       <mat-icon>send</mat-icon>
-      Nộp bài ({{ answeredCount() }}/{{ exercise.questions.blanks.length }})
+      Submit ({{ answeredCount() }}/{{ exercise.questions.blanks.length }})
     </button>
   `,
   styles: [`

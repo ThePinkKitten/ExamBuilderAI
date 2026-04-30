@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ExamBuilderAI.API.Data;
 using ExamBuilderAI.API.Models;
+using ExamBuilderAI.API.DTOs.Exercise;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExamBuilderAI.API.Services;
@@ -71,6 +72,107 @@ public class ExerciseGeneratorService
             await _db.Entry(exercise).Reference(e => e.CurriculumUnit).LoadAsync();
 
         return exercise;
+    }
+
+    /// <summary>
+    /// Generate an exercise via stream. Yields JSON serialized events (chunk, done, error).
+    /// </summary>
+    public async IAsyncEnumerable<string> GenerateStreamAsync(string sectionCode, int? curriculumUnitId, int questionCount, string difficulty, int userId)
+    {
+        var section = await _db.ExerciseSections.FirstOrDefaultAsync(s => s.Code == sectionCode);
+        if (section == null)
+        {
+            yield return JsonSerializer.Serialize(new { type = "error", message = "Invalid section" });
+            yield break;
+        }
+
+        // Load curriculum unit if specified
+        CurriculumUnit? unit = null;
+        if (curriculumUnitId.HasValue)
+        {
+            unit = await _db.CurriculumUnits.FindAsync(curriculumUnitId.Value);
+        }
+
+        // Build the prompt
+        var systemPrompt = GetSystemPrompt();
+        var userPrompt = BuildPrompt(sectionCode, unit, questionCount, difficulty);
+
+        _logger.LogInformation("Generating exercise (stream): section={Section}, unit={Unit}, count={Count}, difficulty={Difficulty}",
+            sectionCode, unit?.UnitTitle ?? "general", questionCount, difficulty);
+
+        var fullContentBuilder = new System.Text.StringBuilder();
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+        // Consume the stream
+        await foreach (var token in _openRouter.ChatCompletionStreamAsync(systemPrompt, userPrompt))
+        {
+            fullContentBuilder.Append(token);
+            yield return JsonSerializer.Serialize(new { type = "chunk", text = token }, jsonOptions);
+        }
+
+        var fullContent = fullContentBuilder.ToString();
+        
+        // Strip markdown if any (AI might sometimes wrap in ```json)
+        fullContent = fullContent.Trim();
+        if (fullContent.StartsWith("```json")) fullContent = fullContent.Substring(7);
+        else if (fullContent.StartsWith("```")) fullContent = fullContent.Substring(3);
+        if (fullContent.EndsWith("```")) fullContent = fullContent.Substring(0, fullContent.Length - 3);
+        fullContent = fullContent.Trim();
+
+        // Validate JSON
+        bool parseSuccess = true;
+        try
+        {
+            JsonDocument.Parse(fullContent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse final streamed JSON: {Content}", fullContent);
+            parseSuccess = false;
+        }
+
+        if (!parseSuccess)
+        {
+            yield return JsonSerializer.Serialize(new { type = "error", message = "Failed to parse AI output." }, jsonOptions);
+            yield break;
+        }
+
+        // Save to DB
+        var exercise = new Exercise
+        {
+            SectionId = section.Id,
+            CurriculumUnitId = curriculumUnitId,
+            GeneratedByUserId = userId,
+            Difficulty = difficulty,
+            QuestionCount = questionCount,
+            Content = fullContent,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Exercises.Add(exercise);
+        await _db.SaveChangesAsync();
+
+        // Reload with navigation properties
+        await _db.Entry(exercise).Reference(e => e.Section).LoadAsync();
+        if (exercise.CurriculumUnitId.HasValue)
+            await _db.Entry(exercise).Reference(e => e.CurriculumUnit).LoadAsync();
+
+        // Yield final done event
+        var response = new ExerciseResponse
+        {
+            Id = exercise.Id,
+            SectionCode = exercise.Section.Code,
+            SectionName = exercise.Section.Name,
+            UnitTitle = exercise.CurriculumUnit?.UnitTitle,
+            Difficulty = exercise.Difficulty,
+            QuestionCount = exercise.QuestionCount,
+            Questions = StripAnswers(exercise.Content, exercise.Section.Code),
+            CreatedAt = exercise.CreatedAt,
+            HasBeenSubmitted = false
+        };
+
+        yield return JsonSerializer.Serialize(new { type = "done", exercise = response }, jsonOptions);
     }
 
     /// <summary>

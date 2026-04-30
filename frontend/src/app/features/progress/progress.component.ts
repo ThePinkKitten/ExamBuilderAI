@@ -13,7 +13,7 @@ import { ProgressOverview } from '../../shared/models/api.models';
     <div class="page-container">
       <div class="page-header animate-fade-in">
         <h1 class="gradient-text">Progress</h1>
-        <p>Xem tiến độ ôn tập của bạn</p>
+        <p>Track your learning progress</p>
       </div>
 
       @if (loading()) {
@@ -26,23 +26,23 @@ import { ProgressOverview } from '../../shared/models/api.models';
           <div class="stat-card glass-card">
             <mat-icon>assignment_turned_in</mat-icon>
             <div class="stat-value">{{ overview()!.totalExercisesDone }}</div>
-            <div class="stat-label">Bài đã làm</div>
+            <div class="stat-label">Completed exercises</div>
           </div>
           <div class="stat-card glass-card">
             <mat-icon>star</mat-icon>
             <div class="stat-value">{{ overview()!.overallAverageScore | number:'1.0-0' }}%</div>
-            <div class="stat-label">Điểm trung bình</div>
+            <div class="stat-label">Average score</div>
           </div>
           <div class="stat-card glass-card">
             <mat-icon>check_circle</mat-icon>
             <div class="stat-value">{{ overview()!.totalCorrectAnswers }}/{{ overview()!.totalQuestionsAnswered }}</div>
-            <div class="stat-label">Câu đúng</div>
+            <div class="stat-label">Correct answers</div>
           </div>
         </div>
 
         <!-- Section Breakdown -->
         @if (overview()!.sectionStats.length > 0) {
-          <h3 class="section-title">📊 Điểm theo từng dạng bài</h3>
+          <h3 class="section-title">📊 Scores by section</h3>
           <div class="section-bars animate-fade-in">
             @for (stat of overview()!.sectionStats; track stat.sectionCode) {
               <div class="bar-item">
@@ -57,7 +57,7 @@ import { ProgressOverview } from '../../shared/models/api.models';
                        [style.width.%]="stat.averageScore"></div>
                 </div>
                 <div class="bar-detail">
-                  {{ stat.exercisesDone }} bài · {{ stat.correctAnswers }}/{{ stat.totalQuestions }} câu đúng
+                  {{ stat.exercisesDone }} exercises · {{ stat.correctAnswers }}/{{ stat.totalQuestions }} correct
                 </div>
               </div>
             }
@@ -65,8 +65,8 @@ import { ProgressOverview } from '../../shared/models/api.models';
         } @else {
           <div class="empty-state glass-card">
             <mat-icon>school</mat-icon>
-            <h3>Chưa có dữ liệu</h3>
-            <p>Làm bài tập đầu tiên để xem tiến độ!</p>
+            <h3>No data yet</h3>
+            <p>Complete your first exercise to see your progress!</p>
           </div>
         }
       }

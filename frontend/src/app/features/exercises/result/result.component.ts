@@ -22,18 +22,18 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
           </div>
           <div class="score-details">
             <h2>
-              @if (result()!.scorePercent >= 80) { 🎉 Xuất sắc! }
-              @else if (result()!.scorePercent >= 50) { 👍 Tốt lắm! }
-              @else { 💪 Cần cố gắng thêm! }
+              @if (result()!.scorePercent >= 80) { 🎉 Excellent! }
+              @else if (result()!.scorePercent >= 50) { 👍 Great job! }
+              @else { 💪 Keep going! }
             </h2>
-            <p>{{ result()!.correctCount }}/{{ result()!.totalQuestions }} câu đúng
+            <p>{{ result()!.correctCount }}/{{ result()!.totalQuestions }} correct answers
               · {{ formatTime(result()!.timeTakenSeconds) }}</p>
           </div>
         </div>
 
         <!-- Review Questions -->
         @if (result()!.sectionCode !== 'paragraph_writing') {
-          <h3 class="review-title">📋 Chi tiết từng câu</h3>
+          <h3 class="review-title">📋 Question details</h3>
           <div class="review-list">
             @for (q of getQuestions(); track q.id; let i = $index) {
               <div class="review-card glass-card"
@@ -43,12 +43,12 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
                 <div class="review-header">
                   <span class="review-status">
                     @if (isCorrect(q)) {
-                      <mat-icon>check_circle</mat-icon> Đúng
+                      <mat-icon>check_circle</mat-icon> Correct
                     } @else {
-                      <mat-icon>cancel</mat-icon> Sai
+                      <mat-icon>cancel</mat-icon> Incorrect
                     }
                   </span>
-                  <span class="review-qnum">Câu {{ q.id }}</span>
+                  <span class="review-qnum">Question {{ q.id }}</span>
                 </div>
 
                 @if (q.sentence || q.statement || q.question || q.prompt) {
@@ -58,11 +58,11 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
                 @if (!isCorrect(q) && q.options) {
                   <div class="answer-comparison">
                     <div class="your-answer">
-                      <strong>Bạn chọn:</strong>
+                      <strong>Your answer:</strong>
                       {{ getOptionLetter(getUserAnswer(q)) }}. {{ q.options[getUserAnswer(q)] }}
                     </div>
                     <div class="correct-answer">
-                      <strong>Đáp án đúng:</strong>
+                      <strong>Correct answer:</strong>
                       {{ getOptionLetter(q.correctAnswer) }}. {{ q.options[q.correctAnswer] }}
                     </div>
                   </div>
@@ -71,10 +71,10 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
                 @if (!isCorrect(q) && !q.options) {
                   <div class="answer-comparison">
                     <div class="your-answer">
-                      <strong>Bạn trả lời:</strong> {{ getUserAnswerText(q) }}
+                      <strong>Your response:</strong> {{ getUserAnswerText(q) }}
                     </div>
                     <div class="correct-answer">
-                      <strong>Đáp án đúng:</strong> {{ q.correctAnswer }}
+                      <strong>Correct answer:</strong> {{ q.correctAnswer }}
                     </div>
                   </div>
                 }
@@ -98,10 +98,10 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
         <!-- Actions -->
         <div class="actions animate-fade-in">
           <button mat-flat-button class="accent-btn" (click)="generateNew()">
-            <mat-icon>refresh</mat-icon> Tạo bài mới
+            <mat-icon>refresh</mat-icon> Generate new exercise
           </button>
           <button mat-stroked-button (click)="goToDashboard()">
-            <mat-icon>dashboard</mat-icon> Về Dashboard
+            <mat-icon>dashboard</mat-icon> Back to Dashboard
           </button>
         </div>
       </div>
@@ -286,7 +286,7 @@ export class ResultComponent implements OnInit {
   }
 
   getUserAnswerText(q: any): string {
-    return this.result()?.userAnswers?.[q.id.toString()] || '(không trả lời)';
+    return this.result()?.userAnswers?.[q.id.toString()] || '(no answer)';
   }
 
   getOptionLetter(index: number): string {

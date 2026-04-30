@@ -5,7 +5,7 @@ import { ProgressOverview } from '../../shared/models/api.models';
 
 @Injectable({ providedIn: 'root' })
 export class ProgressService {
-  private readonly API_URL = 'http://localhost:5000/api/progress';
+  private readonly API_URL = 'http://localhost:5100/api/progress';
 
   constructor(private http: HttpClient) {}
 

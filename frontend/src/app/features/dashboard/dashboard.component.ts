@@ -16,8 +16,8 @@ import { SectionInfo } from '../../shared/models/api.models';
   template: `
     <div class="page-container">
       <div class="page-header animate-fade-in">
-        <h1>Xin chào, <span class="gradient-text">{{ auth.currentUser()?.displayName }}</span> 👋</h1>
-        <p>Chọn một dạng bài tập để bắt đầu ôn tập</p>
+        <h1>Hello, <span class="gradient-text">{{ auth.currentUser()?.displayName }}</span> 👋</h1>
+        <p>Choose an exercise type to get started</p>
       </div>
 
       @if (loading()) {
@@ -39,7 +39,7 @@ import { SectionInfo } from '../../shared/models/api.models';
                   @if (section.totalExercises > 0) {
                     <span class="stat">
                       <mat-icon>check_circle</mat-icon>
-                      {{ section.totalExercises }} bài đã làm
+                      {{ section.totalExercises }} completed
                     </span>
                     <span class="stat" [class]="getScoreClass(section.averageScore)">
                       <mat-icon>star</mat-icon>
@@ -48,7 +48,7 @@ import { SectionInfo } from '../../shared/models/api.models';
                   } @else {
                     <span class="stat new-badge">
                       <mat-icon>fiber_new</mat-icon>
-                      Chưa làm bài nào
+                      No exercises yet
                     </span>
                   }
                 </div>

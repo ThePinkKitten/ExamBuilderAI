@@ -14,7 +14,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
     <div class="questions-list">
       @for (q of exercise.questions.questions; track q.id; let i = $index) {
         <div class="question-card glass-card" [style.animation-delay]="(i * 0.1) + 's'">
-          <div class="question-number">Câu {{ q.id }}</div>
+          <div class="question-number">Question {{ q.id }}</div>
 
           @if (q.instruction) {
             <p class="instruction">{{ q.instruction }}</p>
@@ -29,9 +29,9 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
           </p>
 
           <mat-form-field appearance="outline" class="answer-field">
-            <mat-label>Nhập đáp án</mat-label>
+            <mat-label>Enter answer</mat-label>
             <input matInput [(ngModel)]="answers[q.id]" [name]="'q' + q.id"
-                   placeholder="Nhập câu trả lời...">
+                   placeholder="Enter your answer...">
           </mat-form-field>
         </div>
       }
@@ -40,7 +40,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
     <button class="accent-btn submit-btn" (click)="onSubmit()"
             [disabled]="!allAnswered()">
       <mat-icon>send</mat-icon>
-      Nộp bài ({{ answeredCount() }}/{{ exercise.questionCount }})
+      Submit ({{ answeredCount() }}/{{ exercise.questionCount }})
     </button>
   `,
   styles: [`

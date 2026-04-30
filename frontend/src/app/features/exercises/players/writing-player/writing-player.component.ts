@@ -14,13 +14,13 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
   template: `
     <div class="writing-container glass-card animate-fade-in">
       <div class="topic-section">
-        <h3><mat-icon>edit</mat-icon> Đề bài</h3>
+        <h3><mat-icon>edit</mat-icon> Prompt</h3>
         <p class="topic-text">{{ exercise.questions.topic }}</p>
       </div>
 
       @if (exercise.questions.hints?.length) {
         <div class="hints-section">
-          <h4>💡 Gợi ý từ vựng:</h4>
+          <h4>💡 Vocabulary hints:</h4>
           <div class="hints-chips">
             @for (hint of exercise.questions.hints; track hint) {
               <mat-chip>{{ hint }}</mat-chip>
@@ -31,19 +31,19 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
 
       @if (exercise.questions.wordCount) {
         <p class="word-count-hint">
-          Yêu cầu: {{ exercise.questions.wordCount.min }}-{{ exercise.questions.wordCount.max }} từ
+          Required: {{ exercise.questions.wordCount.min }}-{{ exercise.questions.wordCount.max }} words
         </p>
       }
 
       <mat-form-field appearance="outline" class="writing-field">
-        <mat-label>Viết đoạn văn của bạn</mat-label>
+        <mat-label>Write your paragraph</mat-label>
         <textarea matInput [(ngModel)]="paragraphText" name="paragraph"
                   rows="10" placeholder="Start writing here..."></textarea>
       </mat-form-field>
 
       <div class="writing-stats">
         <span [class.warning]="wordCount < 60" [class.ok]="wordCount >= 80">
-          📝 {{ wordCount }} từ
+          📝 {{ wordCount }} words
         </span>
       </div>
     </div>
@@ -51,7 +51,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
     <button class="accent-btn submit-btn" (click)="onSubmit()"
             [disabled]="wordCount < 20">
       <mat-icon>send</mat-icon>
-      Nộp bài (AI sẽ chấm)
+      Submit (AI will grade)
     </button>
   `,
   styles: [`
