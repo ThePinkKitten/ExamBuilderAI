@@ -54,25 +54,31 @@ import { SectionInfo, CurriculumUnitInfo } from '../../../shared/models/api.mode
         </mat-form-field>
 
         <div class="form-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Number of questions</mat-label>
-            <mat-select [(ngModel)]="questionCount" name="count">
-              <mat-option [value]="1">1 question</mat-option>
-              <mat-option [value]="3">3 questions</mat-option>
-              <mat-option [value]="5">5 questions</mat-option>
-              <mat-option [value]="8">8 questions</mat-option>
-              <mat-option [value]="10">10 questions</mat-option>
-            </mat-select>
-          </mat-form-field>
+          <div class="count-group">
+            <mat-form-field appearance="outline">
+              <mat-label>Number of questions</mat-label>
+              <mat-select [(ngModel)]="selectedCountOption" (ngModelChange)="onCountOptionChange($event)" name="count">
+                <mat-option [value]="1">1 question</mat-option>
+                <mat-option [value]="3">3 questions</mat-option>
+                <mat-option [value]="5">5 questions</mat-option>
+                <mat-option [value]="8">8 questions</mat-option>
+                <mat-option [value]="10">10 questions</mat-option>
+                <mat-option [value]="-1">✏️ Custom...</mat-option>
+              </mat-select>
+              <mat-icon matPrefix>format_list_numbered</mat-icon>
+            </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Difficulty</mat-label>
-            <mat-select [(ngModel)]="difficulty" name="difficulty">
-              <mat-option value="easy">🟢 Easy</mat-option>
-              <mat-option value="medium">🟡 Medium</mat-option>
-              <mat-option value="hard">🔴 Hard</mat-option>
-            </mat-select>
-          </mat-form-field>
+            @if (selectedCountOption === -1) {
+              <mat-form-field appearance="outline" class="custom-count-field animate-fade-in">
+                <mat-label>Custom (1–20)</mat-label>
+                <input matInput type="number" [(ngModel)]="customCount" name="customCount"
+                       min="1" max="20" (ngModelChange)="onCustomCountChange($event)">
+                <mat-icon matPrefix>edit</mat-icon>
+                <mat-hint>Enter 1 to 20</mat-hint>
+              </mat-form-field>
+            }
+          </div>
+
         </div>
 
         <button class="accent-btn generate-btn" (click)="generate()"
@@ -118,8 +124,20 @@ import { SectionInfo, CurriculumUnitInfo } from '../../../shared/models/api.mode
     .form-row {
       display: flex;
       gap: 16px;
+      align-items: flex-start;
 
       mat-form-field { flex: 1; }
+    }
+
+    .count-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .custom-count-field {
+      width: 100%;
     }
 
     .generate-btn {
@@ -150,8 +168,12 @@ export class GeneratorComponent implements OnInit {
   units = signal<CurriculumUnitInfo[]>([]);
   selectedSection = '';
   selectedUnit: number | null = null;
-  questionCount = 5;
-  difficulty = 'medium';
+
+  // Question count: -1 means "custom"
+  selectedCountOption = 5;
+  customCount = 5;
+  questionCount = 5;  // The real value sent to API
+
   generating = signal(false);
   error = signal('');
 
@@ -172,6 +194,20 @@ export class GeneratorComponent implements OnInit {
     });
   }
 
+  onCountOptionChange(value: number) {
+    if (value !== -1) {
+      this.questionCount = value;
+    }
+    // If custom, keep questionCount as last customCount
+  }
+
+  onCustomCountChange(value: number) {
+    // Clamp between 1 and 20
+    const clamped = Math.max(1, Math.min(20, value || 1));
+    this.customCount = clamped;
+    this.questionCount = clamped;
+  }
+
   generate() {
     this.generating.set(true);
     this.error.set('');
@@ -179,12 +215,15 @@ export class GeneratorComponent implements OnInit {
     this.exerciseService.generate({
       sectionCode: this.selectedSection,
       curriculumUnitId: this.selectedUnit,
-      questionCount: this.questionCount,
-      difficulty: this.difficulty
+      questionCount: this.questionCount
     }).subscribe({
-      next: (exercise) => {
+      next: (response: any) => {
         this.generating.set(false);
-        this.router.navigate(['/exercise', exercise.id]);
+        if (response.code === 'BANK_UPDATING') {
+          this.error.set(response.message);
+        } else if (response.id) {
+          this.router.navigate(['/exercise', response.id]);
+        }
       },
       error: (err) => {
         this.generating.set(false);

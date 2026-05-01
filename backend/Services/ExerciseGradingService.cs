@@ -25,6 +25,7 @@ public class ExerciseGradingService
     {
         var exercise = await _db.Exercises
             .Include(e => e.Section)
+            .Include(e => e.ExerciseQuestions).ThenInclude(eq => eq.Question)
             .FirstOrDefaultAsync(e => e.Id == exerciseId);
 
         if (exercise == null) return null;
@@ -39,8 +40,8 @@ public class ExerciseGradingService
         int totalQuestions = exercise.QuestionCount;
         string? aiFeedback = null;
 
-        using var contentDoc = JsonDocument.Parse(exercise.Content);
-        var content = contentDoc.RootElement;
+        var questionsList = exercise.ExerciseQuestions.OrderBy(eq => eq.OrderIndex).Select(eq => eq.Question).ToList();
+        var content = ExerciseGeneratorService.BuildCompositeContent(questionsList, sectionCode, stripAnswers: false);
 
         if (sectionCode == "paragraph_writing")
         {

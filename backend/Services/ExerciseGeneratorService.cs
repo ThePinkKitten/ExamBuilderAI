@@ -20,290 +20,177 @@ public class ExerciseGeneratorService
     }
 
     /// <summary>
-    /// Generate an exercise for the given section. Returns the saved Exercise entity.
+    /// Generate an exercise by fetching pre-generated questions from the bank.
+    /// Returns null if not enough questions are available (triggers 202).
     /// </summary>
-    public async Task<Exercise?> GenerateAsync(string sectionCode, int? curriculumUnitId, int questionCount, string difficulty, int userId)
+    public async Task<Exercise?> GenerateAsync(string sectionCode, int? curriculumUnitId, int questionCount, int userId)
     {
         var section = await _db.ExerciseSections.FirstOrDefaultAsync(s => s.Code == sectionCode);
         if (section == null) return null;
 
-        // Load curriculum unit if specified
-        CurriculumUnit? unit = null;
+        var query = _db.Set<Question>().Where(q => q.SectionId == section.Id && !q.IsAssigned);
+        
         if (curriculumUnitId.HasValue)
         {
-            unit = await _db.CurriculumUnits.FindAsync(curriculumUnitId.Value);
+            query = query.Where(q => q.CurriculumUnitId == curriculumUnitId.Value);
         }
 
-        // Build the prompt
-        var systemPrompt = GetSystemPrompt();
-        var userPrompt = BuildPrompt(sectionCode, unit, questionCount, difficulty);
+        // Randomize order a bit? Or just take the oldest ones. Take oldest ones for now.
+        var availableQuestions = await query.OrderBy(q => q.CreatedAt).Take(questionCount).ToListAsync();
 
-        _logger.LogInformation("Generating exercise: section={Section}, unit={Unit}, count={Count}, difficulty={Difficulty}",
-            sectionCode, unit?.UnitTitle ?? "general", questionCount, difficulty);
-
-        // Call AI
-        var jsonDoc = await _openRouter.ChatCompletionJsonAsync(systemPrompt, userPrompt);
-        if (jsonDoc == null)
+        if (availableQuestions.Count < questionCount)
         {
-            _logger.LogError("AI returned null for exercise generation");
-            return null;
+            _logger.LogWarning("Not enough questions in bank for {SectionCode}. Requested {Req}, available {Avail}.", sectionCode, questionCount, availableQuestions.Count);
+            return null; 
         }
 
-        // Validate and save
-        var content = jsonDoc.RootElement.GetRawText();
+        foreach (var q in availableQuestions)
+        {
+            q.IsAssigned = true;
+        }
 
         var exercise = new Exercise
         {
             SectionId = section.Id,
             CurriculumUnitId = curriculumUnitId,
             GeneratedByUserId = userId,
-            Difficulty = difficulty,
             QuestionCount = questionCount,
-            Content = content,
             CreatedAt = DateTime.UtcNow
         };
 
         _db.Exercises.Add(exercise);
         await _db.SaveChangesAsync();
 
-        // Reload with navigation properties
+        int order = 0;
+        foreach (var q in availableQuestions)
+        {
+            _db.Set<ExerciseQuestion>().Add(new ExerciseQuestion
+            {
+                ExerciseId = exercise.Id,
+                QuestionId = q.Id,
+                OrderIndex = order++
+            });
+        }
+        await _db.SaveChangesAsync();
+
         await _db.Entry(exercise).Reference(e => e.Section).LoadAsync();
         if (exercise.CurriculumUnitId.HasValue)
             await _db.Entry(exercise).Reference(e => e.CurriculumUnit).LoadAsync();
+        
+        await _db.Entry(exercise).Collection(e => e.ExerciseQuestions)
+            .Query().Include(eq => eq.Question).LoadAsync();
 
         return exercise;
     }
 
     /// <summary>
-    /// Generate an exercise via stream. Yields JSON serialized events (chunk, done, error).
+    /// Stitches multiple Question entities into a single composite JSON for the frontend.
+    /// Re-indexes IDs, concatenates passages, and optionally strips answers.
     /// </summary>
-    public async IAsyncEnumerable<string> GenerateStreamAsync(string sectionCode, int? curriculumUnitId, int questionCount, string difficulty, int userId)
+    public static JsonElement BuildCompositeContent(List<Question> questions, string sectionCode, bool stripAnswers)
     {
-        var section = await _db.ExerciseSections.FirstOrDefaultAsync(s => s.Code == sectionCode);
-        if (section == null)
-        {
-            yield return JsonSerializer.Serialize(new { type = "error", message = "Invalid section" });
-            yield break;
-        }
-
-        // Load curriculum unit if specified
-        CurriculumUnit? unit = null;
-        if (curriculumUnitId.HasValue)
-        {
-            unit = await _db.CurriculumUnits.FindAsync(curriculumUnitId.Value);
-        }
-
-        // Build the prompt
-        var systemPrompt = GetSystemPrompt();
-        var userPrompt = BuildPrompt(sectionCode, unit, questionCount, difficulty);
-
-        _logger.LogInformation("Generating exercise (stream): section={Section}, unit={Unit}, count={Count}, difficulty={Difficulty}",
-            sectionCode, unit?.UnitTitle ?? "general", questionCount, difficulty);
-
-        var fullContentBuilder = new System.Text.StringBuilder();
-
-        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
-        // Consume the stream
-        await foreach (var token in _openRouter.ChatCompletionStreamAsync(systemPrompt, userPrompt))
-        {
-            fullContentBuilder.Append(token);
-            yield return JsonSerializer.Serialize(new { type = "chunk", text = token }, jsonOptions);
-        }
-
-        var fullContent = fullContentBuilder.ToString();
-        
-        // Strip markdown if any (AI might sometimes wrap in ```json)
-        fullContent = fullContent.Trim();
-        if (fullContent.StartsWith("```json")) fullContent = fullContent.Substring(7);
-        else if (fullContent.StartsWith("```")) fullContent = fullContent.Substring(3);
-        if (fullContent.EndsWith("```")) fullContent = fullContent.Substring(0, fullContent.Length - 3);
-        fullContent = fullContent.Trim();
-
-        // Validate JSON
-        bool parseSuccess = true;
-        try
-        {
-            JsonDocument.Parse(fullContent);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to parse final streamed JSON: {Content}", fullContent);
-            parseSuccess = false;
-        }
-
-        if (!parseSuccess)
-        {
-            yield return JsonSerializer.Serialize(new { type = "error", message = "Failed to parse AI output." }, jsonOptions);
-            yield break;
-        }
-
-        // Save to DB
-        var exercise = new Exercise
-        {
-            SectionId = section.Id,
-            CurriculumUnitId = curriculumUnitId,
-            GeneratedByUserId = userId,
-            Difficulty = difficulty,
-            QuestionCount = questionCount,
-            Content = fullContent,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _db.Exercises.Add(exercise);
-        await _db.SaveChangesAsync();
-
-        // Reload with navigation properties
-        await _db.Entry(exercise).Reference(e => e.Section).LoadAsync();
-        if (exercise.CurriculumUnitId.HasValue)
-            await _db.Entry(exercise).Reference(e => e.CurriculumUnit).LoadAsync();
-
-        // Yield final done event
-        var response = new ExerciseResponse
-        {
-            Id = exercise.Id,
-            SectionCode = exercise.Section.Code,
-            SectionName = exercise.Section.Name,
-            UnitTitle = exercise.CurriculumUnit?.UnitTitle,
-            Difficulty = exercise.Difficulty,
-            QuestionCount = exercise.QuestionCount,
-            Questions = StripAnswers(exercise.Content, exercise.Section.Code),
-            CreatedAt = exercise.CreatedAt,
-            HasBeenSubmitted = false
-        };
-
-        yield return JsonSerializer.Serialize(new { type = "done", exercise = response }, jsonOptions);
-    }
-
-    /// <summary>
-    /// Extract questions-only content from full exercise content (strip answers + explanations).
-    /// </summary>
-    public static JsonElement StripAnswers(string content, string sectionCode)
-    {
-        using var doc = JsonDocument.Parse(content);
-        var root = doc.RootElement;
-
         using var ms = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(ms))
+        using var writer = new Utf8JsonWriter(ms);
+
+        writer.WriteStartObject();
+
+        if (sectionCode == "paragraph_writing")
         {
-            if (sectionCode == "cloze_test")
-                StripClozeAnswers(root, writer);
-            else if (sectionCode == "reading")
-                StripReadingAnswers(root, writer);
-            else if (sectionCode == "paragraph_writing")
-                StripWritingAnswers(root, writer);
-            else
-                StripMcqOrFillAnswers(root, writer);
+            var q = questions.FirstOrDefault();
+            if (q != null)
+            {
+                using var doc = JsonDocument.Parse(q.Content);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (stripAnswers && (prop.Name == "sampleAnswer" || prop.Name == "rubric")) continue;
+                    prop.WriteTo(writer);
+                }
+            }
         }
+        else if (sectionCode == "reading" || sectionCode == "cloze_test")
+        {
+            var itemsPropName = sectionCode == "reading" ? "questions" : "blanks";
+            var passages = new List<string>();
+            
+            writer.WritePropertyName(itemsPropName);
+            writer.WriteStartArray();
+            int newId = 1;
+            foreach (var q in questions)
+            {
+                using var doc = JsonDocument.Parse(q.Content);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("passage", out var p))
+                {
+                    passages.Add(p.GetString() ?? "");
+                }
+                if (root.TryGetProperty(itemsPropName, out var items))
+                {
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        writer.WriteStartObject();
+                        writer.WriteNumber("id", newId++);
+                        foreach (var prop in item.EnumerateObject())
+                        {
+                            if (prop.Name == "id") continue;
+                            if (stripAnswers && (prop.Name == "correctAnswer" || prop.Name == "explanation" || prop.Name == "acceptableAnswers")) continue;
+                            prop.WriteTo(writer);
+                        }
+                        writer.WriteEndObject();
+                    }
+                }
+            }
+            writer.WriteEndArray();
+            writer.WriteString("passage", string.Join("\n\n---\n\n", passages));
+        }
+        else
+        {
+            writer.WritePropertyName("questions");
+            writer.WriteStartArray();
+            int newId = 1;
+            foreach (var q in questions)
+            {
+                using var doc = JsonDocument.Parse(q.Content);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("questions", out var items))
+                {
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        writer.WriteStartObject();
+                        writer.WriteNumber("id", newId++);
+                        foreach (var prop in item.EnumerateObject())
+                        {
+                            if (prop.Name == "id") continue;
+                            if (stripAnswers && (prop.Name == "correctAnswer" || prop.Name == "explanation" || prop.Name == "acceptableAnswers")) continue;
+                            prop.WriteTo(writer);
+                        }
+                        writer.WriteEndObject();
+                    }
+                }
+            }
+            writer.WriteEndArray();
+        }
+
+        writer.WriteEndObject();
+        writer.Flush();
 
         return JsonDocument.Parse(ms.ToArray()).RootElement.Clone();
     }
 
-    private static void StripMcqOrFillAnswers(JsonElement root, Utf8JsonWriter writer)
+    public static string GetSystemPrompt()
     {
-        writer.WriteStartObject();
-        if (root.TryGetProperty("questions", out var questions))
-        {
-            writer.WriteStartArray("questions");
-            foreach (var q in questions.EnumerateArray())
-            {
-                writer.WriteStartObject();
-                foreach (var prop in q.EnumerateObject())
-                {
-                    if (prop.Name != "correctAnswer" && prop.Name != "explanation" && prop.Name != "acceptableAnswers")
-                        prop.WriteTo(writer);
-                }
-                writer.WriteEndObject();
-            }
-            writer.WriteEndArray();
-        }
-        writer.WriteEndObject();
+        return "You are an expert English teacher creating exercises for Vietnamese students. " +
+               "Generate content suitable for Grade 8 English level (Global Success textbook). Mix various topics.\n" +
+               "Return ONLY valid JSON. Do NOT wrap the JSON in markdown blocks (e.g. ```json). Do NOT add any extra conversational text.\n" +
+               "Explanations should be concise and in English (with Vietnamese translation if helpful).\n\n" +
+               "CRITICAL RULES FOR EXPLANATIONS:\n" +
+               "1. You MUST strictly reference the EXACT options you generated in your explanation.\n" +
+               "2. Do NOT hallucinate or include words in the explanation that are not present in the options array.\n" +
+               "3. Ensure the correct answer strictly matches the explanation.\n" +
+               "4. For pronunciation/stress questions, ensure phonetic accuracy.\n" +
+               "5. Each question must have exactly ONE correct answer.";
     }
 
-    private static void StripClozeAnswers(JsonElement root, Utf8JsonWriter writer)
-    {
-        writer.WriteStartObject();
-        if (root.TryGetProperty("passage", out var passage))
-        {
-            writer.WriteString("passage", passage.GetString());
-        }
-        if (root.TryGetProperty("blanks", out var blanks))
-        {
-            writer.WriteStartArray("blanks");
-            foreach (var b in blanks.EnumerateArray())
-            {
-                writer.WriteStartObject();
-                foreach (var prop in b.EnumerateObject())
-                {
-                    if (prop.Name != "correctAnswer" && prop.Name != "explanation")
-                        prop.WriteTo(writer);
-                }
-                writer.WriteEndObject();
-            }
-            writer.WriteEndArray();
-        }
-        writer.WriteEndObject();
-    }
-
-    private static void StripReadingAnswers(JsonElement root, Utf8JsonWriter writer)
-    {
-        writer.WriteStartObject();
-        if (root.TryGetProperty("passage", out var passage))
-        {
-            writer.WriteString("passage", passage.GetString());
-        }
-        if (root.TryGetProperty("questions", out var questions))
-        {
-            writer.WriteStartArray("questions");
-            foreach (var q in questions.EnumerateArray())
-            {
-                writer.WriteStartObject();
-                foreach (var prop in q.EnumerateObject())
-                {
-                    if (prop.Name != "correctAnswer" && prop.Name != "explanation")
-                        prop.WriteTo(writer);
-                }
-                writer.WriteEndObject();
-            }
-            writer.WriteEndArray();
-        }
-        writer.WriteEndObject();
-    }
-
-    private static void StripWritingAnswers(JsonElement root, Utf8JsonWriter writer)
-    {
-        writer.WriteStartObject();
-        if (root.TryGetProperty("topic", out var topic))
-            writer.WriteString("topic", topic.GetString());
-        if (root.TryGetProperty("hints", out var hints))
-        {
-            writer.WritePropertyName("hints");
-            hints.WriteTo(writer);
-        }
-        if (root.TryGetProperty("wordCount", out var wc))
-        {
-            writer.WritePropertyName("wordCount");
-            wc.WriteTo(writer);
-        }
-        // Strip sampleAnswer and rubric
-        writer.WriteEndObject();
-    }
-
-    private static string GetSystemPrompt()
-    {
-        return @"You are an expert English teacher specialized in Vietnamese Grade 8 English curriculum (Global Success textbook).
-Your task is to generate exam exercises in STRICT JSON format.
-
-RULES:
-1. All content must be appropriate for Vietnamese Grade 8 students (age 13-14).
-2. Return ONLY valid JSON — no markdown, no explanations outside JSON.
-3. Explanations should be concise and in English (with Vietnamese translation if helpful).
-4. For pronunciation/stress questions, ensure phonetic accuracy.
-5. Each question must have exactly ONE correct answer.
-6. Difficulty levels: easy (basic vocab/grammar), medium (mixed), hard (challenging but still grade 8 level).";
-    }
-
-    private static string BuildPrompt(string sectionCode, CurriculumUnit? unit, int questionCount, string difficulty)
+    public static string BuildPrompt(string sectionCode, CurriculumUnit? unit, int questionCount)
     {
         var unitContext = "";
         if (unit != null)
@@ -322,7 +209,7 @@ Use ONLY the grammar, vocabulary, and topics from this unit.";
 
         return sectionCode switch
         {
-            "pronunciation" => $@"Generate {questionCount} pronunciation questions at {difficulty} difficulty.
+            "pronunciation" => $@"Generate {questionCount} pronunciation questions at Grade 8 level.
 {unitContext}
 
 Each question: 4 words where 3 share the same pronunciation for an underlined part, and 1 is different.
@@ -341,7 +228,7 @@ Return JSON:
   ]
 }}",
 
-            "stress" => $@"Generate {questionCount} stress pattern questions at {difficulty} difficulty.
+            "stress" => $@"Generate {questionCount} stress pattern questions at Grade 8 level.
 {unitContext}
 
 Each question: 4 words (2-3 syllables) where 3 share the same stress pattern and 1 is different.
@@ -360,7 +247,7 @@ Return JSON:
   ]
 }}",
 
-            "grammar_vocab" => $@"Generate {questionCount} grammar and vocabulary MCQ questions at {difficulty} difficulty.
+            "grammar_vocab" => $@"Generate {questionCount} grammar and vocabulary MCQ questions at Grade 8 level.
 {unitContext}
 
 Each question: a sentence with a blank + 4 options (A, B, C, D).
@@ -378,7 +265,7 @@ Return JSON:
   ]
 }}",
 
-            "synonym" => $@"Generate {questionCount} synonym questions at {difficulty} difficulty.
+            "synonym" => $@"Generate {questionCount} synonym questions at Grade 8 level.
 {unitContext}
 
 Each question: a sentence with an underlined word + 4 options. Choose the CLOSEST meaning.
@@ -397,7 +284,7 @@ Return JSON:
   ]
 }}",
 
-            "antonym" => $@"Generate {questionCount} antonym questions at {difficulty} difficulty.
+            "antonym" => $@"Generate {questionCount} antonym questions at Grade 8 level.
 {unitContext}
 
 Each question: a sentence with an underlined word + 4 options. Choose the OPPOSITE meaning.
@@ -416,7 +303,7 @@ Return JSON:
   ]
 }}",
 
-            "cloze_test" => $@"Generate a cloze test passage with {questionCount} blanks at {difficulty} difficulty.
+            "cloze_test" => $@"Generate a cloze test passage with {questionCount} blanks at Grade 8 level.
 {unitContext}
 
 Create a coherent passage (150-200 words) with numbered blanks. Each blank has 4 options.
@@ -434,7 +321,7 @@ Return JSON:
   ]
 }}",
 
-            "reading" => $@"Generate a reading comprehension exercise at {difficulty} difficulty.
+            "reading" => $@"Generate a reading comprehension exercise at Grade 8 level.
 {unitContext}
 
 Create a passage (200-250 words) with:
@@ -463,7 +350,7 @@ Return JSON:
   ]
 }}",
 
-            "sentence_completion" => $@"Generate {questionCount} sentence completion questions at {difficulty} difficulty.
+            "sentence_completion" => $@"Generate {questionCount} sentence completion questions at Grade 8 level.
 {unitContext}
 
 Each question: an incomplete sentence that students must complete.
@@ -482,7 +369,7 @@ Return JSON:
   ]
 }}",
 
-            "word_form" => $@"Generate {questionCount} word form questions at {difficulty} difficulty.
+            "word_form" => $@"Generate {questionCount} word form questions at Grade 8 level.
 {unitContext}
 
 Each question: a sentence with a blank + a given base word. Students fill in the correct form.
@@ -501,7 +388,7 @@ Return JSON:
   ]
 }}",
 
-            "paragraph_writing" => $@"Generate a paragraph writing prompt at {difficulty} difficulty.
+            "paragraph_writing" => $@"Generate a paragraph writing prompt at Grade 8 level.
 {unitContext}
 
 Create a writing topic suitable for Grade 8 students (80-100 words expected).

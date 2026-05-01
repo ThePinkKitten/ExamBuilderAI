@@ -42,7 +42,6 @@ export interface GenerateExerciseRequest {
   sectionCode: string;
   curriculumUnitId?: number | null;
   questionCount: number;
-  difficulty: string;
 }
 
 export interface ExerciseResponse {
@@ -50,7 +49,6 @@ export interface ExerciseResponse {
   sectionCode: string;
   sectionName: string;
   unitTitle: string | null;
-  difficulty: string;
   questionCount: number;
   questions: any;
   createdAt: string;
@@ -81,7 +79,6 @@ export interface ExerciseHistoryItem {
   sectionCode: string;
   sectionName: string;
   unitTitle: string | null;
-  difficulty: string;
   scorePercent: number | null;
   createdAt: string;
   completedAt: string | null;

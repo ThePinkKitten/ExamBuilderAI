@@ -11,6 +11,8 @@ public class AppDbContext : DbContext
     public DbSet<CurriculumUnit> CurriculumUnits => Set<CurriculumUnit>();
     public DbSet<ExerciseSection> ExerciseSections => Set<ExerciseSection>();
     public DbSet<Exercise> Exercises => Set<Exercise>();
+    public DbSet<Question> Questions => Set<Question>();
+    public DbSet<ExerciseQuestion> ExerciseQuestions => Set<ExerciseQuestion>();
     public DbSet<ExerciseResult> ExerciseResults => Set<ExerciseResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -60,6 +62,22 @@ public class AppDbContext : DbContext
                 .WithMany(ex => ex.Results)
                 .HasForeignKey(r => r.ExerciseId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ExerciseQuestion (Many-to-Many join table)
+        modelBuilder.Entity<ExerciseQuestion>(e =>
+        {
+            e.HasKey(eq => new { eq.ExerciseId, eq.QuestionId });
+
+            e.HasOne(eq => eq.Exercise)
+                .WithMany(ex => ex.ExerciseQuestions)
+                .HasForeignKey(eq => eq.ExerciseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(eq => eq.Question)
+                .WithMany(q => q.ExerciseQuestions)
+                .HasForeignKey(eq => eq.QuestionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // === SEED DATA ===

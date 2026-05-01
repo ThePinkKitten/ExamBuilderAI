@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using ExamBuilderAI.API.Data;
+using ExamBuilderAI.API.Models;
 using ExamBuilderAI.API.DTOs.Exercise;
 using ExamBuilderAI.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -86,12 +87,13 @@ public class ExerciseController : ControllerBase
             request.SectionCode,
             request.CurriculumUnitId,
             request.QuestionCount,
-            request.Difficulty,
             userId
         );
 
         if (exercise == null)
-            return BadRequest(new { message = "Failed to generate exercise. Please try again." });
+            return StatusCode(202, new { message = "Question bank is being updated. Please try again in a moment.", code = "BANK_UPDATING" });
+
+        var questionsList = exercise.ExerciseQuestions.OrderBy(eq => eq.OrderIndex).Select(eq => eq.Question).ToList();
 
         var response = new ExerciseResponse
         {
@@ -99,45 +101,13 @@ public class ExerciseController : ControllerBase
             SectionCode = exercise.Section.Code,
             SectionName = exercise.Section.Name,
             UnitTitle = exercise.CurriculumUnit?.UnitTitle,
-            Difficulty = exercise.Difficulty,
             QuestionCount = exercise.QuestionCount,
-            Questions = ExerciseGeneratorService.StripAnswers(exercise.Content, exercise.Section.Code),
+            Questions = ExerciseGeneratorService.BuildCompositeContent(questionsList, exercise.Section.Code, stripAnswers: true),
             CreatedAt = exercise.CreatedAt,
             HasBeenSubmitted = false
         };
 
         return Ok(response);
-    }
-
-    /// <summary>
-    /// Generate a new exercise using Server-Sent Events (SSE).
-    /// </summary>
-    [HttpPost("generate-stream")]
-    public async Task GenerateStream([FromBody] GenerateExerciseRequest request)
-    {
-        var userId = GetUserId();
-
-        Response.ContentType = "text/event-stream";
-        Response.Headers.Append("Cache-Control", "no-cache");
-        Response.Headers.Append("Connection", "keep-alive");
-
-        // Send an empty event or comment to force HTTP 200 headers immediately.
-        await Response.WriteAsync(": connected\n\n");
-        await Response.Body.FlushAsync();
-
-        var stream = _generator.GenerateStreamAsync(
-            request.SectionCode,
-            request.CurriculumUnitId,
-            request.QuestionCount,
-            request.Difficulty,
-            userId
-        );
-
-        await foreach (var evt in stream)
-        {
-            await Response.WriteAsync($"data: {evt}\n\n");
-            await Response.Body.FlushAsync();
-        }
     }
 
     /// <summary>
@@ -150,6 +120,7 @@ public class ExerciseController : ControllerBase
         var exercise = await _db.Exercises
             .Include(e => e.Section)
             .Include(e => e.CurriculumUnit)
+            .Include(e => e.ExerciseQuestions).ThenInclude(eq => eq.Question)
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (exercise == null) return NotFound();
@@ -157,17 +128,16 @@ public class ExerciseController : ControllerBase
         var hasSubmitted = await _db.ExerciseResults
             .AnyAsync(r => r.ExerciseId == id && r.UserId == userId);
 
+        var questionsList = exercise.ExerciseQuestions.OrderBy(eq => eq.OrderIndex).Select(eq => eq.Question).ToList();
+
         var response = new ExerciseResponse
         {
             Id = exercise.Id,
             SectionCode = exercise.Section.Code,
             SectionName = exercise.Section.Name,
             UnitTitle = exercise.CurriculumUnit?.UnitTitle,
-            Difficulty = exercise.Difficulty,
             QuestionCount = exercise.QuestionCount,
-            Questions = hasSubmitted
-                ? JsonDocument.Parse(exercise.Content).RootElement.Clone()
-                : ExerciseGeneratorService.StripAnswers(exercise.Content, exercise.Section.Code),
+            Questions = ExerciseGeneratorService.BuildCompositeContent(questionsList, exercise.Section.Code, stripAnswers: !hasSubmitted),
             CreatedAt = exercise.CreatedAt,
             HasBeenSubmitted = hasSubmitted
         };
@@ -185,6 +155,7 @@ public class ExerciseController : ControllerBase
 
         var exercise = await _db.Exercises
             .Include(e => e.Section)
+            .Include(e => e.ExerciseQuestions).ThenInclude(eq => eq.Question)
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (exercise == null) return NotFound();
@@ -192,6 +163,8 @@ public class ExerciseController : ControllerBase
         var result = await _grading.GradeAsync(id, userId, request.UserAnswers, request.TimeTakenSeconds);
         if (result == null)
             return BadRequest(new { message = "Failed to grade exercise." });
+
+        var questionsList = exercise.ExerciseQuestions.OrderBy(eq => eq.OrderIndex).Select(eq => eq.Question).ToList();
 
         var response = new ExerciseResultResponse
         {
@@ -202,13 +175,217 @@ public class ExerciseController : ControllerBase
             TotalQuestions = result.TotalQuestions,
             ScorePercent = result.ScorePercent,
             TimeTakenSeconds = result.TimeTakenSeconds,
-            FullContent = JsonDocument.Parse(exercise.Content).RootElement.Clone(),
+            FullContent = ExerciseGeneratorService.BuildCompositeContent(questionsList, exercise.Section.Code, stripAnswers: false),
             UserAnswers = JsonDocument.Parse(result.UserAnswers).RootElement.Clone(),
             AiFeedback = result.AiFeedback,
             CompletedAt = result.CompletedAt
         };
 
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Get an exercise's review (already graded result).
+    /// </summary>
+    [HttpGet("{id}/review")]
+    public async Task<IActionResult> GetReview(int id)
+    {
+        var userId = GetUserId();
+        var exercise = await _db.Exercises
+            .Include(e => e.Section)
+            .Include(e => e.ExerciseQuestions).ThenInclude(eq => eq.Question)
+            .FirstOrDefaultAsync(e => e.Id == id);
+
+        if (exercise == null) return NotFound();
+
+        var result = await _db.ExerciseResults.FirstOrDefaultAsync(r => r.ExerciseId == id && r.UserId == userId);
+        if (result == null) return BadRequest(new { message = "Exercise not yet submitted." });
+
+        var questionsList = exercise.ExerciseQuestions.OrderBy(eq => eq.OrderIndex).Select(eq => eq.Question).ToList();
+
+        var response = new ExerciseResultResponse
+        {
+            ExerciseId = exercise.Id,
+            SectionCode = exercise.Section.Code,
+            SectionName = exercise.Section.Name,
+            CorrectCount = result.CorrectCount,
+            TotalQuestions = result.TotalQuestions,
+            ScorePercent = result.ScorePercent,
+            TimeTakenSeconds = result.TimeTakenSeconds,
+            FullContent = ExerciseGeneratorService.BuildCompositeContent(questionsList, exercise.Section.Code, stripAnswers: false),
+            UserAnswers = JsonDocument.Parse(result.UserAnswers).RootElement.Clone(),
+            AiFeedback = result.AiFeedback,
+            CompletedAt = result.CompletedAt
+        };
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Re-answer an entire exercise (copies all questions to a new exercise attempt).
+    /// </summary>
+    [HttpPost("{id}/re-answer")]
+    public async Task<IActionResult> ReAnswer(int id)
+    {
+        var userId = GetUserId();
+        var oldExercise = await _db.Exercises
+            .Include(e => e.Section)
+            .Include(e => e.CurriculumUnit)
+            .Include(e => e.ExerciseQuestions)
+            .FirstOrDefaultAsync(e => e.Id == id);
+
+        if (oldExercise == null) return NotFound();
+
+        var newExercise = new Exercise
+        {
+            SectionId = oldExercise.SectionId,
+            CurriculumUnitId = oldExercise.CurriculumUnitId,
+            GeneratedByUserId = userId,
+            QuestionCount = oldExercise.QuestionCount,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Exercises.Add(newExercise);
+        await _db.SaveChangesAsync();
+
+        foreach (var eq in oldExercise.ExerciseQuestions)
+        {
+            _db.Set<ExerciseQuestion>().Add(new ExerciseQuestion
+            {
+                ExerciseId = newExercise.Id,
+                QuestionId = eq.QuestionId,
+                OrderIndex = eq.OrderIndex
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        return Ok(new { newExerciseId = newExercise.Id });
+    }
+
+    /// <summary>
+    /// Retake mistakes. Gathers up to 10 wrong questions from past exercises of a specific section, or randomly.
+    /// </summary>
+    [HttpPost("retake-mistakes")]
+    public async Task<IActionResult> RetakeMistakes([FromBody] RetakeMistakesRequest request)
+    {
+        var userId = GetUserId();
+        
+        // Find all results
+        var resultsQuery = _db.ExerciseResults
+            .Include(r => r.Exercise).ThenInclude(e => e.Section)
+            .Include(r => r.Exercise).ThenInclude(e => e.ExerciseQuestions).ThenInclude(eq => eq.Question)
+            .Where(r => r.UserId == userId);
+
+        if (!string.IsNullOrEmpty(request.SectionCode))
+        {
+            resultsQuery = resultsQuery.Where(r => r.Exercise.Section.Code == request.SectionCode);
+        }
+
+        var results = await resultsQuery.ToListAsync();
+        var wrongQuestionIds = new HashSet<int>();
+
+        foreach (var r in results)
+        {
+            var exercise = r.Exercise;
+            // Paragraph writing doesn't have easily extractable 'wrong questions'
+            if (exercise.Section.Code == "paragraph_writing") continue;
+
+            var questionsList = exercise.ExerciseQuestions.OrderBy(eq => eq.OrderIndex).Select(eq => eq.Question).ToList();
+            var content = ExerciseGeneratorService.BuildCompositeContent(questionsList, exercise.Section.Code, stripAnswers: false);
+            var userAnswers = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(r.UserAnswers);
+            if (userAnswers == null) continue;
+
+            var questionsNode = content.TryGetProperty("questions", out var qs) ? qs : 
+                               (content.TryGetProperty("blanks", out var bs) ? bs : default);
+            
+            if (questionsNode.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var q in questionsNode.EnumerateArray())
+                {
+                    var qId = q.GetProperty("id").GetInt32().ToString();
+                    var newIdIndex = int.Parse(qId) - 1;
+                    if (newIdIndex < 0 || newIdIndex >= questionsList.Count) continue;
+
+                    bool isCorrect = false;
+
+                    if (userAnswers.TryGetValue(qId, out var userAnswer))
+                    {
+                        var type = q.TryGetProperty("type", out var t) ? t.GetString() : null;
+
+                        if (type == "true_false")
+                        {
+                            var correctAnswer = q.GetProperty("correctAnswer").GetBoolean();
+                            if (userAnswer.ValueKind == JsonValueKind.True || userAnswer.ValueKind == JsonValueKind.False)
+                            {
+                                isCorrect = (userAnswer.GetBoolean() == correctAnswer);
+                            }
+                        }
+                        else if (q.TryGetProperty("correctAnswer", out var correctProp))
+                        {
+                            if (correctProp.ValueKind == JsonValueKind.Number && userAnswer.ValueKind == JsonValueKind.Number)
+                            {
+                                isCorrect = (userAnswer.GetInt32() == correctProp.GetInt32());
+                            }
+                            else if (correctProp.ValueKind == JsonValueKind.String && userAnswer.ValueKind == JsonValueKind.String)
+                            {
+                                var userText = userAnswer.GetString()?.Trim().ToLowerInvariant() ?? "";
+                                var correctText = correctProp.GetString()?.Trim().ToLowerInvariant() ?? "";
+                                if (userText == correctText) isCorrect = true;
+                                else if (q.TryGetProperty("acceptableAnswers", out var acc))
+                                {
+                                    foreach (var a in acc.EnumerateArray())
+                                    {
+                                        if (a.GetString()?.Trim().ToLowerInvariant() == userText) { isCorrect = true; break; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!isCorrect)
+                    {
+                        wrongQuestionIds.Add(questionsList[newIdIndex].Id);
+                    }
+                }
+            }
+        }
+
+        if (wrongQuestionIds.Count == 0)
+            return BadRequest(new { message = "You have no mistakes to fix!" });
+
+        // Grab up to QuestionCount wrong questions
+        var randomWrongIds = wrongQuestionIds.OrderBy(x => Guid.NewGuid()).Take(request.QuestionCount ?? 10).ToList();
+
+        // Need to create a new exercise. We need a section. 
+        // If they requested a specific section, use that.
+        // Otherwise, group by section and pick the most common one, or just pick the section of the first question.
+        var firstQ = await _db.Set<Question>().Include(q => q.Section).FirstOrDefaultAsync(q => q.Id == randomWrongIds.First());
+        if (firstQ == null) return BadRequest(new { message = "Error finding question." });
+
+        var newExercise = new Exercise
+        {
+            SectionId = firstQ.SectionId, // Note: mixing questions from different sections in one exercise breaks the player. So we enforce single section.
+            GeneratedByUserId = userId,
+            QuestionCount = randomWrongIds.Count,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Exercises.Add(newExercise);
+        await _db.SaveChangesAsync();
+
+        int order = 0;
+        foreach (var qid in randomWrongIds)
+        {
+            _db.Set<ExerciseQuestion>().Add(new ExerciseQuestion
+            {
+                ExerciseId = newExercise.Id,
+                QuestionId = qid,
+                OrderIndex = order++
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        return Ok(new { newExerciseId = newExercise.Id });
     }
 
     /// <summary>
@@ -235,7 +412,6 @@ public class ExerciseController : ControllerBase
                 SectionCode = e.Section.Code,
                 SectionName = e.Section.Name,
                 UnitTitle = e.CurriculumUnit != null ? e.CurriculumUnit.UnitTitle : null,
-                Difficulty = e.Difficulty,
                 ScorePercent = e.Results
                     .Where(r => r.UserId == userId)
                     .Select(r => (double?)r.ScorePercent)

@@ -24,13 +24,10 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
           }
 
           <mat-radio-group [(ngModel)]="answers[q.id]" class="options-group">
-            @for (opt of q.options; track $index) {
-              <mat-radio-button [value]="$index" class="option-item">
+            @for (opt of getShuffledOptions(q); track $index) {
+              <mat-radio-button [value]="opt.originalIndex" class="option-item">
                 <span class="option-label">{{ getOptionLetter($index) }}.</span>
-                <span>{{ opt }}</span>
-                @if (q.underlinedParts && q.underlinedParts[$index]) {
-                  <span class="phonetic-hint">/{{ q.underlinedParts[$index] }}/</span>
-                }
+                <span [innerHTML]="formatOption(opt.text, opt.underlinedPart)"></span>
               </mat-radio-button>
             }
           </mat-radio-group>
@@ -41,7 +38,7 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
     <button class="accent-btn submit-btn" (click)="onSubmit()"
             [disabled]="!allAnswered()">
       <mat-icon>send</mat-icon>
-      Submit ({{ answeredCount() }}/{{ exercise.questionCount }})
+      Submit ({{ answeredCount() }}/{{ exercise?.questionCount || 0 }})
     </button>
   `,
   styles: [`
@@ -113,6 +110,14 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
       color: var(--accent-secondary);
     }
 
+    :host ::ng-deep .pronunciation-underline {
+      text-decoration: underline;
+      text-decoration-color: var(--accent-primary);
+      text-decoration-thickness: 2px;
+      font-weight: 700;
+      color: var(--accent-primary);
+    }
+
     .submit-btn {
       display: flex;
       align-items: center;
@@ -125,10 +130,48 @@ import { ExerciseResponse } from '../../../../shared/models/api.models';
   `]
 })
 export class McqPlayerComponent {
-  @Input() exercise!: ExerciseResponse;
+  @Input() set exercise(val: ExerciseResponse) {
+    this._exercise = val;
+    this.initShuffledOptions();
+  }
+  get exercise(): ExerciseResponse {
+    return this._exercise;
+  }
+  private _exercise!: ExerciseResponse;
+
   @Output() submitAnswers = new EventEmitter<{ [key: string]: any }>();
 
   answers: { [key: string]: number } = {};
+  
+  // Cache for shuffled options: questionId -> array of mapped options
+  private shuffledOptionsMap: { [questionId: string]: { text: string, originalIndex: number, underlinedPart?: string }[] } = {};
+
+  initShuffledOptions() {
+    if (!this._exercise || !this._exercise.questions || !this._exercise.questions.questions) return;
+    
+    this.shuffledOptionsMap = {};
+    for (const q of this._exercise.questions.questions) {
+      if (!q.options) continue;
+      
+      const mappedOptions = q.options.map((opt: string, idx: number) => ({
+        text: opt,
+        originalIndex: idx,
+        underlinedPart: q.underlinedParts ? q.underlinedParts[idx] : undefined
+      }));
+      
+      // Fisher-Yates shuffle
+      for (let i = mappedOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [mappedOptions[i], mappedOptions[j]] = [mappedOptions[j], mappedOptions[i]];
+      }
+      
+      this.shuffledOptionsMap[q.id] = mappedOptions;
+    }
+  }
+
+  getShuffledOptions(q: any) {
+    return this.shuffledOptionsMap[q.id] || [];
+  }
 
   getOptionLetter(index: number): string {
     return String.fromCharCode(65 + index);
@@ -138,6 +181,19 @@ export class McqPlayerComponent {
     if (!word) return sentence;
     return sentence.replace(new RegExp(`\\b${word}\\b`, 'gi'),
       `<span class="underlined">${word}</span>`);
+  }
+
+  formatOption(option: string, underlinedPart?: string): string {
+    if (!underlinedPart) return option;
+    
+    const index = option.toLowerCase().indexOf(underlinedPart.toLowerCase());
+    if (index === -1) return option; // Fallback if part is not found
+    
+    const before = option.substring(0, index);
+    const match = option.substring(index, index + underlinedPart.length);
+    const after = option.substring(index + underlinedPart.length);
+    
+    return `${before}<u class="pronunciation-underline">${match}</u>${after}`;
   }
 
   answeredCount(): number {

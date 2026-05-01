@@ -87,7 +87,7 @@ import { MatListModule } from '@angular/material/list';
       font-size: 32px;
       width: 32px;
       height: 32px;
-      color: #7c3aed;
+      color: var(--accent-secondary);
     }
 
     .logo-text {
@@ -119,18 +119,21 @@ import { MatListModule } from '@angular/material/list';
         font-size: 20px;
         width: 20px;
         height: 20px;
+        color: var(--accent-secondary);
       }
 
       &:hover {
-        background: rgba(124, 58, 237, 0.1);
-        color: var(--text-primary);
+        background: rgba(225, 29, 72, 0.08);
+        color: var(--accent-primary);
+
+        mat-icon { color: var(--accent-primary); }
       }
 
       &.active {
-        background: rgba(124, 58, 237, 0.15);
-        color: #a78bfa;
+        background: rgba(225, 29, 72, 0.14);
+        color: var(--accent-primary);
 
-        mat-icon { color: #7c3aed; }
+        mat-icon { color: var(--accent-primary); }
       }
     }
 
@@ -148,10 +151,14 @@ import { MatListModule } from '@angular/material/list';
       gap: 8px;
       color: var(--text-secondary);
       font-size: 13px;
+
+      mat-icon {
+        color: var(--accent-secondary);
+      }
     }
 
     .logout-btn {
-      color: var(--text-muted);
+      color: var(--accent-secondary);
       &:hover { color: var(--danger); }
     }
 

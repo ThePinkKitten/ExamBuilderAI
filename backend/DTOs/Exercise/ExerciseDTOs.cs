@@ -15,9 +15,21 @@ public class GenerateExerciseRequest
 
     [Range(1, 20)]
     public int QuestionCount { get; set; } = 5;
+}
 
-    [RegularExpression("^(easy|medium|hard)$")]
-    public string Difficulty { get; set; } = "medium";
+public class RetakeMistakesRequest
+{
+    /// <summary>
+    /// Optional section code to scope mistakes to a specific section.
+    /// If null, pulls mistakes globally.
+    /// </summary>
+    public string? SectionCode { get; set; }
+
+    /// <summary>
+    /// Number of mistakes to retake (default 10).
+    /// </summary>
+    [Range(1, 20)]
+    public int? QuestionCount { get; set; } = 10;
 }
 
 public class SubmitExerciseRequest
@@ -40,7 +52,6 @@ public class ExerciseResponse
     public string SectionCode { get; set; } = string.Empty;
     public string SectionName { get; set; } = string.Empty;
     public string? UnitTitle { get; set; }
-    public string Difficulty { get; set; } = string.Empty;
     public int QuestionCount { get; set; }
 
     /// <summary>
@@ -86,7 +97,6 @@ public class ExerciseHistoryItem
     public string SectionCode { get; set; } = string.Empty;
     public string SectionName { get; set; } = string.Empty;
     public string? UnitTitle { get; set; }
-    public string Difficulty { get; set; } = string.Empty;
     public double? ScorePercent { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }

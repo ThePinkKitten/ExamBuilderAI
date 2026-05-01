@@ -78,22 +78,27 @@ public class OpenRouterService
                     return null;
                 }
 
-                // Parse the response to extract the message content
+                // Parse the response to extract the message content safely
                 using var doc = JsonDocument.Parse(responseContent);
-                var messageContent = doc.RootElement
-                    .GetProperty("choices")[0]
-                    .GetProperty("message")
-                    .GetProperty("content")
-                    .GetString();
-
-                if (string.IsNullOrWhiteSpace(messageContent))
+                var root = doc.RootElement;
+                
+                if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                 {
-                    _logger.LogWarning("OpenRouter returned empty content (attempt {Attempt}/{MaxRetries})", attempt, maxRetries);
-                    if (attempt < maxRetries) continue;
-                    return null;
+                    var firstChoice = choices[0];
+                    if (firstChoice.TryGetProperty("message", out var message) && 
+                        message.TryGetProperty("content", out var contentElement))
+                    {
+                        var messageContent = contentElement.GetString();
+                        if (!string.IsNullOrWhiteSpace(messageContent))
+                        {
+                            return messageContent;
+                        }
+                    }
                 }
 
-                return messageContent;
+                _logger.LogWarning("OpenRouter returned unexpected JSON structure or empty content (attempt {Attempt}/{MaxRetries}). Response: {ResponseContent}", attempt, maxRetries, responseContent);
+                if (attempt < maxRetries) continue;
+                return null;
             }
             catch (Exception ex)
             {
@@ -108,6 +113,55 @@ public class OpenRouterService
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Send a chat completion request to OpenRouter and return the RAW HTTP response body.
+    /// Useful for debugging and extracting reasoning from models like DeepSeek-R1.
+    /// </summary>
+    public async Task<string?> ChatCompletionRawResponseAsync(string systemPrompt, string userPrompt)
+    {
+        var model = _config["OpenRouter:Model"] ?? "google/gemini-2.0-flash-exp:free";
+        var apiKey = _config["OpenRouter:ApiKey"] ?? throw new InvalidOperationException("OpenRouter:ApiKey is not configured");
+
+        var useJsonMode = !string.Equals(_config["OpenRouter:UseJsonMode"], "false", StringComparison.OrdinalIgnoreCase);
+        var requestBody = new Dictionary<string, object>
+        {
+            ["model"] = model,
+            ["messages"] = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt }
+            },
+            ["temperature"] = 0.7,
+            ["max_tokens"] = 4096
+        };
+
+        if (useJsonMode)
+        {
+            requestBody["response_format"] = new { type = "json_object" };
+        }
+
+        try
+        {
+            var json = JsonSerializer.Serialize(requestBody, JsonOptions);
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+
+            request.Headers.Add("Authorization", $"Bearer {apiKey}");
+            request.Headers.Add("HTTP-Referer", "https://exambuilder-ai.local");
+            request.Headers.Add("X-Title", "ExamBuilder AI");
+
+            var response = await _httpClient.SendAsync(request);
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "OpenRouter raw request failed");
+            return null;
+        }
     }
 
     /// <summary>

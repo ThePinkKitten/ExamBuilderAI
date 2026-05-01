@@ -36,8 +36,11 @@ builder.Services.AddScoped<ExerciseGeneratorService>();
 builder.Services.AddScoped<ExerciseGradingService>();
 builder.Services.AddHttpClient<OpenRouterService>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(150);
+    client.Timeout = TimeSpan.FromSeconds(900);
 });
+
+// Register background Producer Service
+builder.Services.AddHostedService<QuestionBankService>();
 
 // === CORS (allow Angular dev server) ===
 builder.Services.AddCors(options =>

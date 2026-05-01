@@ -35,10 +35,7 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
               @if (exercise()!.unitTitle) {
                 <span>{{ exercise()!.unitTitle }}</span> ·
               }
-              <span class="difficulty-badge" [attr.data-level]="exercise()!.difficulty">
-                {{ exercise()!.difficulty }}
-              </span>
-              · {{ exercise()!.questionCount }} questions
+              <span>{{ exercise()!.questionCount }} questions</span>
             </p>
           </div>
           <div class="timer">
@@ -113,14 +110,6 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
       }
     }
 
-    .difficulty-badge {
-      text-transform: capitalize;
-      font-weight: 600;
-
-      &[data-level="easy"] { color: var(--success); }
-      &[data-level="medium"] { color: var(--warning); }
-      &[data-level="hard"] { color: var(--danger); }
-    }
 
     .timer {
       margin-left: auto;
