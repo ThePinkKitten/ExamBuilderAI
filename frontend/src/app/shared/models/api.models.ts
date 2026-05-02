@@ -44,6 +44,11 @@ export interface GenerateExerciseRequest {
   questionCount: number;
 }
 
+export interface RetakeMistakesRequest {
+  sectionCode?: string;
+  questionCount?: number;
+}
+
 export interface ExerciseResponse {
   id: number;
   sectionCode: string;

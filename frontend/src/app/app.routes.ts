@@ -31,6 +31,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/progress/progress.component').then(m => m.ProgressComponent)
   },
+  {
+    path: 'history',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/history/history.component').then(m => m.HistoryComponent)
+  },
+  {
+    path: 'retake',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/retake/retake.component').then(m => m.RetakeComponent)
+  },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: '**', redirectTo: '/dashboard' }
 ];

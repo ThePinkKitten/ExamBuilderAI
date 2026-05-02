@@ -35,6 +35,14 @@ import { MatListModule } from '@angular/material/list';
               <mat-icon>trending_up</mat-icon>
               <span>Progress</span>
             </a>
+            <a routerLink="/history" routerLinkActive="active" class="nav-item">
+              <mat-icon>history</mat-icon>
+              <span>History</span>
+            </a>
+            <a routerLink="/retake" routerLinkActive="active" class="nav-item">
+              <mat-icon>build_circle</mat-icon>
+              <span>Mistake Bank</span>
+            </a>
           </div>
 
           <div class="sidebar-footer">

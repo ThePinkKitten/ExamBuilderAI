@@ -3,14 +3,20 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { DecimalPipe } from '@angular/common';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ExerciseResultResponse } from '../../../shared/models/api.models';
+import { ExerciseService } from '../../../core/services/exercise.service';
 
 @Component({
   selector: 'app-result',
   standalone: true,
-  imports: [MatIconModule, MatButtonModule, DecimalPipe],
+  imports: [MatIconModule, MatButtonModule, DecimalPipe, MatProgressSpinnerModule],
   template: `
-    @if (result()) {
+    @if (loading()) {
+      <div class="loading-center">
+        <mat-spinner diameter="48"></mat-spinner>
+      </div>
+    } @else if (result()) {
       <div class="page-container">
         <!-- Score Banner -->
         <div class="score-banner glass-card animate-fade-in"
@@ -97,10 +103,25 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
 
         <!-- Actions -->
         <div class="actions animate-fade-in">
-          <button mat-flat-button class="accent-btn" (click)="generateNew()">
-            <mat-icon>refresh</mat-icon> Generate new exercise
+          <button mat-flat-button class="accent-btn" (click)="generateNew()" [disabled]="actionLoading()">
+            <mat-icon>refresh</mat-icon> New exercise
           </button>
-          <button mat-stroked-button (click)="goToDashboard()">
+          
+          <button mat-stroked-button color="primary" (click)="reAnswer()" [disabled]="actionLoading()">
+            @if (actionLoading()) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              <mat-icon>replay</mat-icon> Re-answer (All)
+            }
+          </button>
+
+          @if (result()!.scorePercent < 100 && result()!.sectionCode !== 'paragraph_writing') {
+            <button mat-flat-button color="warn" (click)="fixMistakes()" [disabled]="actionLoading()">
+              <mat-icon>build</mat-icon> Fix Mistakes
+            </button>
+          }
+
+          <button mat-stroked-button (click)="goToDashboard()" [disabled]="actionLoading()">
             <mat-icon>dashboard</mat-icon> Back to Dashboard
           </button>
         </div>
@@ -108,6 +129,12 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
     }
   `,
   styles: [`
+    .loading-center {
+      display: flex;
+      justify-content: center;
+      padding: 80px 0;
+    }
+
     .score-banner {
       display: flex;
       align-items: center;
@@ -244,22 +271,47 @@ import { ExerciseResultResponse } from '../../../shared/models/api.models';
 
     .actions {
       display: flex;
-      gap: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
       margin-bottom: 32px;
     }
   `]
 })
 export class ResultComponent implements OnInit {
   result = signal<ExerciseResultResponse | null>(null);
+  loading = signal<boolean>(false);
+  actionLoading = signal<boolean>(false);
 
-  constructor(private route: ActivatedRoute, private router: Router) {}
+  constructor(
+    private route: ActivatedRoute, 
+    private router: Router,
+    private exerciseService: ExerciseService
+  ) {}
 
   ngOnInit() {
     const state = history.state;
     if (state?.result) {
       this.result.set(state.result);
     } else {
-      this.router.navigate(['/dashboard']);
+      // Try to fetch it using the route parameter
+      this.route.paramMap.subscribe(params => {
+        const id = Number(params.get('id'));
+        if (id) {
+          this.loading.set(true);
+          this.exerciseService.getReview(id).subscribe({
+            next: (res) => {
+              this.result.set(res);
+              this.loading.set(false);
+            },
+            error: () => {
+              this.loading.set(false);
+              this.router.navigate(['/dashboard']);
+            }
+          });
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
+      });
     }
   }
 
@@ -309,5 +361,35 @@ export class ResultComponent implements OnInit {
 
   goToDashboard() {
     this.router.navigate(['/dashboard']);
+  }
+
+  reAnswer() {
+    const id = this.result()?.exerciseId;
+    if (!id) return;
+    
+    this.actionLoading.set(true);
+    this.exerciseService.reAnswerExercise(id).subscribe({
+      next: (res) => {
+        this.actionLoading.set(false);
+        this.router.navigate(['/exercise', res.newExerciseId]);
+      },
+      error: () => this.actionLoading.set(false)
+    });
+  }
+
+  fixMistakes() {
+    const section = this.result()?.sectionCode;
+    if (!section) return;
+    
+    // We can call retakeMistakes scoped to this section. 
+    // It will fetch wrong questions from this section (including the ones they just got wrong!)
+    this.actionLoading.set(true);
+    this.exerciseService.retakeMistakes({ sectionCode: section, questionCount: 10 }).subscribe({
+      next: (res) => {
+        this.actionLoading.set(false);
+        this.router.navigate(['/exercise', res.newExerciseId]);
+      },
+      error: () => this.actionLoading.set(false)
+    });
   }
 }

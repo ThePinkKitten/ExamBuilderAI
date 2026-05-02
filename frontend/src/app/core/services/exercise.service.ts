@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   SectionInfo, CurriculumUnitInfo, GenerateExerciseRequest,
   ExerciseResponse, SubmitExerciseRequest, ExerciseResultResponse,
-  ExerciseHistoryItem, PaginatedResponse
+  ExerciseHistoryItem, PaginatedResponse, RetakeMistakesRequest
 } from '../../shared/models/api.models';
 
 @Injectable({ providedIn: 'root' })
@@ -98,5 +98,17 @@ export class ExerciseService {
     return this.http.get<PaginatedResponse<ExerciseHistoryItem>>(
       `${this.API_URL}/history?page=${page}&pageSize=${pageSize}`
     );
+  }
+
+  getReview(id: number): Observable<ExerciseResultResponse> {
+    return this.http.get<ExerciseResultResponse>(`${this.API_URL}/${id}/review`);
+  }
+
+  reAnswerExercise(id: number): Observable<{ newExerciseId: number }> {
+    return this.http.post<{ newExerciseId: number }>(`${this.API_URL}/${id}/re-answer`, {});
+  }
+
+  retakeMistakes(request: RetakeMistakesRequest): Observable<{ newExerciseId: number }> {
+    return this.http.post<{ newExerciseId: number }>(`${this.API_URL}/retake-mistakes`, request);
   }
 }
