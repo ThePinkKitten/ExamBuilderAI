@@ -17,4 +17,5 @@ Thumbs.db
 **/*.log
 
 # Secrets (environment-specific settings)
+backend/appsettings.json
 backend/appsettings.*.json

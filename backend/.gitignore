@@ -6,6 +6,7 @@
 *.sln.docstates
 
 # App settings with secrets
+appsettings.json
 appsettings.Development.json
 appsettings.*.json
 
