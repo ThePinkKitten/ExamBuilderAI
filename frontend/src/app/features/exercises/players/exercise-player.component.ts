@@ -18,60 +18,68 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
             McqPlayerComponent, ClozePlayerComponent, ReadingPlayerComponent,
             FillInPlayerComponent, WritingPlayerComponent],
   template: `
-    <div class="page-container">
+    <div class="page-container focus-page">
       @if (loading()) {
         <div class="loading-center">
           <mat-spinner diameter="48"></mat-spinner>
           <p>Loading exercise...</p>
         </div>
       } @else if (exercise()) {
-        <div class="exercise-header animate-fade-in">
-          <button mat-icon-button (click)="goBack()">
-            <mat-icon>arrow_back</mat-icon>
-          </button>
-          <div>
-            <h2>{{ exercise()!.sectionName }}</h2>
-            <p class="exercise-meta">
-              @if (exercise()!.unitTitle) {
-                <span>{{ exercise()!.unitTitle }}</span> ·
-              }
-              <span>{{ exercise()!.questionCount }} questions</span>
-            </p>
-          </div>
-          <div class="timer">
-            <mat-icon>timer</mat-icon>
-            <span>{{ formatTime(elapsedSeconds()) }}</span>
-          </div>
-        </div>
+        <div class="player-master-wrapper animate-fade-in">
+          <header class="player-header">
+            <div class="header-side">
+              <button mat-icon-button (click)="goBack()" class="back-btn-player" matTooltip="Back to Dashboard">
+                <mat-icon>arrow_back</mat-icon>
+              </button>
+            </div>
+            
+            <div class="header-center">
+              <h2 class="gradient-text">{{ exercise()!.sectionName }}</h2>
+              <p class="exercise-meta">
+                @if (exercise()!.unitTitle) {
+                  <span>{{ exercise()!.unitTitle }}</span> ·
+                }
+                <span>{{ exercise()!.questionCount }} {{ exercise()!.questionCount === 1 ? 'question' : 'questions' }}</span>
+              </p>
+            </div>
 
-        <div class="player-container animate-fade-in">
-          @switch (getPlayerType(exercise()!.sectionCode)) {
-            @case ('mcq') {
-              <app-mcq-player
-                [exercise]="exercise()!"
-                (submitAnswers)="onSubmit($event)" />
+            <div class="header-side align-right">
+              <div class="timer-card">
+                <mat-icon>timer</mat-icon>
+                <span>{{ formatTime(elapsedSeconds()) }}</span>
+              </div>
+            </div>
+          </header>
+
+          <main class="player-content">
+            @switch (getPlayerType(exercise()!.sectionCode)) {
+              @case ('mcq') {
+                <app-mcq-player
+                  [exercise]="exercise()!"
+                  (submitAnswers)="onSubmit($event)" />
+              }
+              @case ('cloze') {
+                <app-cloze-player
+                  [exercise]="exercise()!"
+                  (submitAnswers)="onSubmit($event)" />
+              }
+              @case ('reading') {
+                <app-reading-player
+                  [exercise]="exercise()!"
+                  (submitAnswers)="onSubmit($event)" />
+              }
+              @case ('fill-in') {
+                <app-fill-in-player
+                  [exercise]="exercise()!"
+                  (submitAnswers)="onSubmit($event)" />
+              }
+              @case ('writing') {
+                <app-writing-player
+                  [exercise]="exercise()!"
+                  (submitAnswers)="onSubmit($event)" />
+              }
             }
-            @case ('cloze') {
-              <app-cloze-player
-                [exercise]="exercise()!"
-                (submitAnswers)="onSubmit($event)" />
-            }
-            @case ('reading') {
-              <app-reading-player
-                [exercise]="exercise()!"
-                (submitAnswers)="onSubmit($event)" />
-            }
-            @case ('fill-in') {
-              <app-fill-in-player
-                [exercise]="exercise()!"
-                (submitAnswers)="onSubmit($event)" />
-            }
-            @case ('writing') {
-              <app-writing-player
-                [exercise]="exercise()!"
-                (submitAnswers)="onSubmit($event)" />
-            }
-          }
+          </main>
         </div>
       }
 
@@ -93,37 +101,86 @@ import { WritingPlayerComponent } from './writing-player/writing-player.componen
       color: var(--text-secondary);
     }
 
-    .exercise-header {
+    .focus-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 32px !important;
+    }
+
+    .focus-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 24px !important;
+    }
+
+    .player-master-wrapper {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .player-header {
+      width: 100%;
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-bottom: 24px;
+      justify-content: space-between;
+    }
 
-      h2 { font-size: 22px; font-weight: 700; }
+    .header-side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      
+      &.align-right {
+        justify-content: flex-end;
+      }
+    }
+
+    .header-center {
+      flex: 2;
+      text-align: center;
+      
+      h2 { 
+        font-size: 28px; 
+        font-weight: 700;
+        margin-bottom: 4px;
+        line-height: 1.2;
+      }
 
       .exercise-meta {
         color: var(--text-secondary);
-        font-size: 13px;
+        font-size: 14px;
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 6px;
       }
     }
 
-
-    .timer {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--text-secondary);
-      font-size: 16px;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
+    .back-btn-player {
+      color: var(--text-muted);
+      margin-left: -12px;
     }
 
-    .player-container {
-      max-width: 800px;
+    .timer-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-primary);
+      font-size: 18px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      background: rgba(244, 63, 94, 0.05);
+      padding: 6px 16px;
+      border-radius: 20px;
+    }
+
+    .player-content {
+      width: 100%;
     }
 
     .submit-overlay {

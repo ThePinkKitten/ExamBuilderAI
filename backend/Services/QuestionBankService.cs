@@ -9,11 +9,13 @@ public class QuestionBankService : BackgroundService
 {
     private readonly IServiceProvider _services;
     private readonly ILogger<QuestionBankService> _logger;
+    private readonly IConfiguration _config;
 
-    public QuestionBankService(IServiceProvider services, ILogger<QuestionBankService> logger)
+    public QuestionBankService(IServiceProvider services, ILogger<QuestionBankService> logger, IConfiguration config)
     {
         _services = services;
         _logger = logger;
+        _config = config;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -24,17 +26,26 @@ public class QuestionBankService : BackgroundService
         {
             try
             {
-                await GenerateNextQuestionAsync(stoppingToken);
+                var isEnabled = _config.GetValue<bool>("QuestionBank:Enabled");
+                if (isEnabled)
+                {
+                    await GenerateNextQuestionAsync(stoppingToken);
+                }
+                else
+                {
+                    // If disabled, check less frequently to save resources
+                    await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                    continue;
+                }
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred in QuestionBankService. Retrying in 10s...");
-                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                _logger.LogError(ex, "Error occurred in QuestionBankService. Retrying in 60s...");
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
 
-            // Optional delay between generations to respect rate limits if needed.
-            // If we want to run as fast as possible, just a small delay to avoid 100% CPU on empty iterations.
-            await Task.Delay(2000, stoppingToken);
+            await Task.Delay(30000, stoppingToken);
         }
 
         _logger.LogInformation("Question Bank Producer Service is stopping.");
@@ -44,35 +55,67 @@ public class QuestionBankService : BackgroundService
     {
         using var scope = _services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var openRouter = scope.ServiceProvider.GetRequiredService<OpenRouterService>();
-
-        // Min-First Balancing: find section with lowest available question count
-        var stats = await db.ExerciseSections
-            .Select(s => new
-            {
-                Section = s,
-                AvailableCount = db.Set<Question>().Count(q => q.SectionId == s.Id && !q.IsAssigned)
-            })
-            .OrderBy(x => x.AvailableCount)
-            .FirstOrDefaultAsync(stoppingToken);
-
-        if (stats == null) return; // No sections
-
-        // We could also do it by CurriculumUnit for grammar/vocab, but let's stick to Section-level general questions for now unless we loop over units too.
-        // For simplicity: generate 1 question.
-        var sectionCode = stats.Section.Code;
-        var sectionId = stats.Section.Id;
         
-        // We set questionCount = 1 for the prompt, except if it's reading/cloze, the AI will naturally generate 1 passage and multiple sub-questions.
+        var provider = _config["AIProvider"] ?? "OpenRouter";
+        const int MAX_PER_COMBINATION = 100;
+
+        // 1. Gather all potential (Section, Unit) combinations
+        var sections = await db.ExerciseSections.ToListAsync(stoppingToken);
+        var units = await db.CurriculumUnits.ToListAsync(stoppingToken);
+        
+        var combinations = new List<(ExerciseSection section, int? unitId, string unitTitle, int count)>();
+
+        foreach (var s in sections)
+        {
+            // General unit for this section
+            int genCount = await db.Questions.CountAsync(q => q.SectionId == s.Id && q.CurriculumUnitId == null && !q.IsAssigned, stoppingToken);
+            combinations.Add((s, null, "General", genCount));
+
+            foreach (var u in units)
+            {
+                int count = await db.Questions.CountAsync(q => q.SectionId == s.Id && q.CurriculumUnitId == u.Id && !q.IsAssigned, stoppingToken);
+                combinations.Add((s, u.Id, u.UnitTitle, count));
+            }
+        }
+
+        // 2. Find the one with the FEWEST questions that is still UNDER the limit
+        var target = combinations
+            .Where(x => x.count < MAX_PER_COMBINATION)
+            .OrderBy(x => x.count)
+            .FirstOrDefault();
+
+        if (target.section == null)
+        {
+            _logger.LogInformation("Bank Service: All (Section, Unit) combinations have reached the limit of {Limit}. Sleeping...", MAX_PER_COMBINATION);
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+            return;
+        }
+
+        CurriculumUnit? targetUnit = target.unitId.HasValue ? units.First(u => u.Id == target.unitId.Value) : null;
+
+        // 3. Generate prompt
         var systemPrompt = ExerciseGeneratorService.GetSystemPrompt();
-        var userPrompt = ExerciseGeneratorService.BuildPrompt(sectionCode, null, 1);
+        var userPrompt = ExerciseGeneratorService.BuildPrompt(target.section.Code, targetUnit, 1);
 
-        _logger.LogInformation("Bank Service: Generating 1 {SectionCode} question (Current Available: {AvailableCount})", sectionCode, stats.AvailableCount);
+        _logger.LogInformation("Bank Service: Generating 1 {SectionCode} question for {UnitTitle} (Current: {Count}/{Limit})", 
+            target.section.Code, target.unitTitle, target.count, MAX_PER_COMBINATION);
 
-        var jsonDoc = await openRouter.ChatCompletionJsonAsync(systemPrompt, userPrompt);
+        JsonDocument? jsonDoc = null;
+
+        if (provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+        {
+            var gemini = scope.ServiceProvider.GetRequiredService<GeminiService>();
+            jsonDoc = await gemini.GenerateContentAsync(systemPrompt, userPrompt, forceJson: true, cancellationToken: stoppingToken);
+        }
+        else
+        {
+            var openRouter = scope.ServiceProvider.GetRequiredService<OpenRouterService>();
+            jsonDoc = await openRouter.ChatCompletionJsonAsync(systemPrompt, userPrompt, cancellationToken: stoppingToken);
+        }
+
         if (jsonDoc == null)
         {
-            _logger.LogWarning("Bank Service: AI returned null for {SectionCode}", sectionCode);
+            _logger.LogWarning("Bank Service: AI returned null for {SectionCode}", target.section.Code);
             return;
         }
 
@@ -85,21 +128,23 @@ public class QuestionBankService : BackgroundService
         }
         catch
         {
-            _logger.LogWarning("Bank Service: AI returned invalid JSON for {SectionCode}", sectionCode);
+            _logger.LogWarning("Bank Service: AI returned invalid JSON for {SectionCode}", target.section.Code);
             return;
         }
 
         var question = new Question
         {
-            SectionId = sectionId,
+            SectionId = target.section.Id,
+            CurriculumUnitId = target.unitId,
             Content = content,
             IsAssigned = false,
             CreatedAt = DateTime.UtcNow
         };
 
-        db.Set<Question>().Add(question);
+        db.Questions.Add(question);
         await db.SaveChangesAsync(stoppingToken);
 
-        _logger.LogInformation("Bank Service: Added new {SectionCode} question to bank.", sectionCode);
+        _logger.LogInformation("Bank Service: Added new {SectionCode} question for {UnitTitle} to bank.", 
+            target.section.Code, target.unitTitle);
     }
 }

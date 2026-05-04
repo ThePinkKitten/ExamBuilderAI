@@ -102,11 +102,11 @@ html, body {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 18px rgba(225, 29, 72, 0.25);
+  box-shadow: none !important; // Removed soft shadows globally
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgba(225, 29, 72, 0.35);
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2) !important; // Minimal shadow on hover
   }
 
   &:disabled {
@@ -153,4 +153,23 @@ html, body {
 
 .mat-mdc-dialog-container {
   --mdc-dialog-container-color: var(--bg-secondary);
+}
+
+// Custom Dropdown Panel
+.custom-dropdown-panel {
+  max-height: 250px !important;
+  margin-top: 4px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+  border-radius: 12px !important;
+  background: white !important;
+  z-index: 9999 !important;
+
+  .mat-mdc-option {
+    min-height: 44px !important;
+    font-size: 14px !important;
+    
+    &:hover { background: var(--bg-secondary) !important; }
+    &.mdc-list-item--selected { background: rgba(225, 29, 72, 0.05) !important; }
+  }
 }

@@ -25,7 +25,7 @@ public class OpenRouterService
     /// <summary>
     /// Send a chat completion request to OpenRouter and return the response content as a string.
     /// </summary>
-    public async Task<string?> ChatCompletionAsync(string systemPrompt, string userPrompt, int maxRetries = 3)
+    public async Task<string?> ChatCompletionAsync(string systemPrompt, string userPrompt, int maxRetries = 3, CancellationToken cancellationToken = default)
     {
         var model = _config["OpenRouter:Model"] ?? "google/gemini-2.0-flash-exp:free";
         var apiKey = _config["OpenRouter:ApiKey"] ?? throw new InvalidOperationException("OpenRouter:ApiKey is not configured");
@@ -62,8 +62,8 @@ public class OpenRouterService
                 request.Headers.Add("HTTP-Referer", "https://exambuilder-ai.local");
                 request.Headers.Add("X-Title", "ExamBuilder AI");
 
-                var response = await _httpClient.SendAsync(request);
-                var responseContent = await response.Content.ReadAsStringAsync();
+                var response = await _httpClient.SendAsync(request, cancellationToken);
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -100,12 +100,16 @@ public class OpenRouterService
                 if (attempt < maxRetries) continue;
                 return null;
             }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "OpenRouter request failed (attempt {Attempt}/{MaxRetries})", attempt, maxRetries);
                 if (attempt < maxRetries)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
+                    await Task.Delay(TimeSpan.FromSeconds(attempt * 2), cancellationToken);
                     continue;
                 }
                 return null;
@@ -168,14 +172,14 @@ public class OpenRouterService
     /// Send a chat completion and parse the JSON response directly.
     /// Returns null if parsing fails after retries.
     /// </summary>
-    public async Task<JsonDocument?> ChatCompletionJsonAsync(string systemPrompt, string userPrompt, int maxRetries = 3)
+    public async Task<JsonDocument?> ChatCompletionJsonAsync(string systemPrompt, string userPrompt, int maxRetries = 3, CancellationToken cancellationToken = default)
     {
         JsonException? lastError = null;
         string? lastContent = null;
 
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            var content = await ChatCompletionAsync(systemPrompt, userPrompt, maxRetries: 1);
+            var content = await ChatCompletionAsync(systemPrompt, userPrompt, maxRetries: 1, cancellationToken);
             if (content == null) continue;
 
             lastContent = content;

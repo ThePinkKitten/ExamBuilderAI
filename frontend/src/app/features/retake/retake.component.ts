@@ -55,7 +55,9 @@ import { SectionInfo } from '../../shared/models/api.models';
           @if (loading()) {
             <mat-spinner diameter="24"></mat-spinner>
           } @else {
-            <mat-icon>play_arrow</mat-icon> Practice Mistakes
+            <ng-container>
+              <mat-icon>play_arrow</mat-icon> Practice Mistakes
+            </ng-container>
           }
         </button>
       </div>
@@ -64,6 +66,9 @@ import { SectionInfo } from '../../shared/models/api.models';
   styles: [`
     .page-header {
       margin-bottom: 32px;
+      padding-left: 48px; // Room for toggle button
+      text-align: left;
+      
       h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
       p { color: var(--text-secondary); font-size: 15px; }
     }
@@ -76,9 +81,13 @@ import { SectionInfo } from '../../shared/models/api.models';
       display: flex;
       flex-direction: column;
       align-items: center;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 24px;
 
       h2 {
         font-size: 24px;
+        font-weight: 700;
         margin-bottom: 16px;
       }
 
@@ -94,7 +103,8 @@ import { SectionInfo } from '../../shared/models/api.models';
       width: 80px;
       height: 80px;
       border-radius: 50%;
-      background: rgba(124, 58, 237, 0.1);
+      background: #fbf7fa;
+      border: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: center;

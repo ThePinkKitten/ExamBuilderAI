@@ -38,6 +38,10 @@ builder.Services.AddHttpClient<OpenRouterService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(900);
 });
+builder.Services.AddHttpClient<GeminiService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(900);
+});
 
 // Register background Producer Service
 builder.Services.AddHostedService<QuestionBankService>();

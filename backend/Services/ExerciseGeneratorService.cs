@@ -209,10 +209,16 @@ Use ONLY the grammar, vocabulary, and topics from this unit.";
 
         return sectionCode switch
         {
-            "pronunciation" => $@"Generate {questionCount} pronunciation questions at Grade 8 level.
-{unitContext}
+            "pronunciation" => $@"Generate {questionCount} pronunciation questions for Grade 8 English students.
+Context: {unitContext}
 
-Each question: 4 words where 3 share the same pronunciation for an underlined part, and 1 is different.
+Requirements:
+- Each question must contain exactly 4 words.
+- Exactly 3 words must share the SAME pronunciation for a specific underlined part, and EXACTLY 1 word must be DIFFERENT.
+- Vary the phonetic targets across questions (e.g., vowels, consonants, diphthongs, silent letters).
+- The `correctAnswer` must be an integer representing the 0-based index of the correct option.
+- In the explanation, you MUST include the IPA transcriptions for the underlined parts of all 4 options to clearly justify the answer.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
@@ -220,10 +226,36 @@ Return JSON:
     {{
       ""id"": 1,
       ""instruction"": ""Choose the word whose underlined part is pronounced differently from the others"",
-      ""options"": [""word1"", ""word2"", ""word3"", ""word4""],
-      ""underlinedParts"": [""ea"", ""ea"", ""ea"", ""ea""],
+      ""options"": [""machine"", ""champion"", ""children"", ""teacher""],
+      ""underlinedParts"": [""ch"", ""ch"", ""ch"", ""ch""],
+      ""correctAnswer"": 0,
+      ""explanation"": ""The 'ch' in 'machine' is pronounced as /ʃ/, while in the others it is pronounced as /tʃ/.""
+    }}
+  ]
+}}",
+
+            "ed_pronunciation" => $@"Generate {questionCount} pronunciation questions focusing on '-ed' endings for Grade 8 English students.
+Context: {unitContext}
+
+Requirements:
+- Each question must contain exactly 4 common regular verbs in past tense (-ed).
+- Exactly 3 words must have the SAME '-ed' pronunciation, and EXACTLY 1 word must be DIFFERENT.
+- The underlined part must always be ""ed"" for all options.
+- Use only standard '-ed' pronunciation rules: /t/, /d/, /ɪd/.
+- Randomize verbs and pronunciation patterns across questions.
+- The `correctAnswer` must be an integer representing the 0-based index of the correct option.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
+
+Return JSON:
+{{
+  ""questions"": [
+    {{
+      ""id"": 1,
+      ""instruction"": ""Choose the word whose -ed part is pronounced differently from the others"",
+      ""options"": [""worked"", ""watched"", ""wanted"", ""stopped""],
+      ""underlinedParts"": [""ed"", ""ed"", ""ed"", ""ed""],
       ""correctAnswer"": 2,
-      ""explanation"": ""Explain why this word is different, include IPA if possible""
+      ""explanation"": ""'wanted' is pronounced /ˈwɒntɪd/ with /ɪd/ because the base verb ends in 't', while the others are pronounced /t/.""
     }}
   ]
 }}",
@@ -240,17 +272,25 @@ Return JSON:
       ""id"": 1,
       ""instruction"": ""Choose the word having a different stress pattern from the others"",
       ""options"": [""word1"", ""word2"", ""word3"", ""word4""],
+      ""underlinedParts"": [""o"", ""o"", ""o"", ""o""],
       ""stressPatterns"": [""Oo"", ""Oo"", ""oO"", ""Oo""],
       ""correctAnswer"": 2,
       ""explanation"": ""Explain the stress difference""
     }}
   ]
-}}",
+}}
+IMPORTANT: Even for stress pattern, you MUST provide 'underlinedParts' (usually the main vowel of the first or second syllable) to maintain visual consistency with pronunciation questions.",
 
-            "grammar_vocab" => $@"Generate {questionCount} grammar and vocabulary MCQ questions at Grade 8 level.
-{unitContext}
+            "grammar_vocab" => $@"Generate {questionCount} grammar and vocabulary multiple-choice questions for Grade 8 English students.
+Context: {unitContext}
 
-Each question: a sentence with a blank + 4 options (A, B, C, D).
+Requirements:
+- Each question must be a sentence with a single blank space represented by '___'.
+- Provide exactly 4 options. The options MUST NOT contain prefixes like 'A.', 'B.', 'C.', 'D.'.
+- Balance the questions between grammar rules and vocabulary usage based on the context.
+- The `correctAnswer` must be an integer representing the 0-based index of the correct option.
+- Explain the grammar rule or vocabulary usage clearly in the explanation.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
@@ -260,63 +300,90 @@ Return JSON:
       ""sentence"": ""She has been living here ___ 2010."",
       ""options"": [""for"", ""since"", ""during"", ""while""],
       ""correctAnswer"": 1,
-      ""explanation"": ""'since' is used with a specific point in time""
+      ""explanation"": ""'Since' is used with the present perfect tense to indicate a specific starting point in time (2010), whereas 'for' is used for a duration of time.""
     }}
   ]
 }}",
 
-            "synonym" => $@"Generate {questionCount} synonym questions at Grade 8 level.
-{unitContext}
+            "synonym" => $@"Generate {questionCount} synonym multiple-choice questions for Grade 8 English students.
+Context: {unitContext}
 
-Each question: a sentence with an underlined word + 4 options. Choose the CLOSEST meaning.
+Requirements:
+- Each question must consist of a sentence with one specific word intended to be underlined.
+- Provide exactly 4 options. The options MUST NOT contain prefixes like 'A.', 'B.', 'C.', 'D.'.
+- The objective is to choose the option that has the CLOSEST meaning to the target word in the given context.
+- The `underlinedWord` field MUST match the exact spelling and casing of the target word as it appears in the `sentence` (excluding punctuation) to allow exact string matching on the frontend.
+- The `correctAnswer` must be an integer representing the 0-based index of the correct option.
+- Explain the meaning of the target word and the correct synonym clearly in the explanation.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
   ""questions"": [
     {{
       ""id"": 1,
-      ""sentence"": ""The movie was absolutely fantastic."",
+      ""sentence"": ""The special effects in the movie were absolutely fantastic."",
       ""underlinedWord"": ""fantastic"",
       ""options"": [""terrible"", ""wonderful"", ""boring"", ""normal""],
       ""correctAnswer"": 1,
-      ""explanation"": ""'wonderful' is closest in meaning to 'fantastic'""
+      ""explanation"": ""In this context, 'fantastic' describes something exceptionally good or great. 'Wonderful' is the closest in meaning, while the other options have negative or neutral meanings.""
     }}
   ]
 }}",
 
-            "antonym" => $@"Generate {questionCount} antonym questions at Grade 8 level.
-{unitContext}
+            "antonym" => $@"Generate {questionCount} antonym multiple-choice questions for Grade 8 English students.
+Context: {unitContext}
 
-Each question: a sentence with an underlined word + 4 options. Choose the OPPOSITE meaning.
+Requirements:
+- Each question must consist of a sentence with one specific word intended to be underlined.
+- Provide exactly 4 options. The options MUST NOT contain prefixes like 'A.', 'B.', 'C.', 'D.'.
+- The objective is to choose the option that has the OPPOSITE meaning to the target word in the given context.
+- The `underlinedWord` field MUST match the exact spelling and casing of the target word as it appears in the `sentence` (excluding punctuation) to allow exact string matching on the frontend.
+- The `correctAnswer` must be an integer representing the 0-based index of the correct option.
+- Explain the meaning of the target word and the correct antonym clearly in the explanation.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
   ""questions"": [
     {{
       ""id"": 1,
-      ""sentence"": ""The exam was extremely difficult."",
-      ""underlinedWord"": ""difficult"",
-      ""options"": [""hard"", ""easy"", ""challenging"", ""tough""],
-      ""correctAnswer"": 1,
-      ""explanation"": ""'easy' is the opposite of 'difficult'""
+      ""sentence"": ""The movie was extremely boring."",
+      ""underlinedWord"": ""boring"",
+      ""options"": [""interesting"", ""dull"", ""tiresome"", ""tedious""],
+      ""correctAnswer"": 0,
+      ""explanation"": ""'Interesting' is the opposite of 'boring'.""
     }}
   ]
 }}",
 
-            "cloze_test" => $@"Generate a cloze test passage with {questionCount} blanks at Grade 8 level.
-{unitContext}
+            "cloze_test" => $@"Generate a coherent cloze test passage for Grade 8 English students.
+Context: {unitContext}
 
-Create a coherent passage (150-200 words) with numbered blanks. Each blank has 4 options.
+Requirements:
+- The passage should be between 150-200 words.
+- Create exactly {questionCount} blanks in the passage, represented as '(1)___', '(2)___', etc.
+- Each blank must have exactly 4 options. The options MUST NOT contain prefixes like 'A.', 'B.', 'C.', 'D.'.
+- The `blanks` array must contain {questionCount} objects, where the `id` matches the number in the passage.
+- The `correctAnswer` must be an integer representing the 0-based index of the correct option.
+- Ensure the questions cover a mix of grammar (articles, prepositions, tenses) and vocabulary context.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
-  ""passage"": ""The environment is (1)___ important topic today. Many people (2)___ worried about..."",
+  ""passage"": ""The environment is (1)___ important topic today. Many people (2)___ worried about climate change and its effects on our planet."",
   ""blanks"": [
     {{
       ""id"": 1,
       ""options"": [""a"", ""an"", ""the"", ""no article""],
       ""correctAnswer"": 1,
-      ""explanation"": ""'an' because 'important' starts with a vowel sound""
+      ""explanation"": ""We use 'an' because the following word 'important' begins with a vowel sound.""
+    }},
+    {{
+      ""id"": 2,
+      ""options"": [""is"", ""am"", ""are"", ""be""],
+      ""correctAnswer"": 2,
+      ""explanation"": ""'People' is a plural noun, so we use the plural verb 'are'.""
     }}
   ]
 }}",
@@ -350,29 +417,41 @@ Return JSON:
   ]
 }}",
 
-            "sentence_completion" => $@"Generate {questionCount} sentence completion questions at Grade 8 level.
-{unitContext}
+            "sentence_completion" => $@"Generate {questionCount} sentence completion questions for Grade 8 English students.
+Context: {unitContext}
 
-Each question: an incomplete sentence that students must complete.
+Requirements:
+- Each question must provide an incomplete sentence (the `prompt`) that requires a logical and grammatically correct completion.
+- The `correctAnswer` should be the most common/natural completion.
+- The `acceptableAnswers` array MUST include at least 3-4 other grammatically correct variations to help with flexible grading.
+- Completions should ideally be between 3 to 7 words long.
+- The questions should focus on Grade 8 structures (e.g., Conditionals, Relative Clauses, Reported Speech, or Tenses).
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
   ""questions"": [
     {{
       ""id"": 1,
-      ""instruction"": ""Complete the sentence"",
+      ""instruction"": ""Complete the following sentence with a suitable phrase"",
       ""prompt"": ""If it rains tomorrow, we ___"",
       ""correctAnswer"": ""will stay at home"",
-      ""acceptableAnswers"": [""will stay at home"", ""won't go out"", ""will not go outside""],
-      ""explanation"": ""Conditional type 1: If + present simple, will + V-infinitive""
+      ""acceptableAnswers"": [""will stay at home"", ""won't go out"", ""will not go outside"", ""will stay inside""],
+      ""explanation"": ""This is a Conditional Sentence Type 1, used to talk about a possible future event. Structure: If + Present Simple, Will + Verb (bare).""
     }}
   ]
 }}",
 
-            "word_form" => $@"Generate {questionCount} word form questions at Grade 8 level.
-{unitContext}
+            "word_form" => $@"Generate {questionCount} word form (word formation) questions for Grade 8 English students.
+Context: {unitContext}
 
-Each question: a sentence with a blank + a given base word. Students fill in the correct form.
+Requirements:
+- Each question must provide a sentence with a single blank space '___' and a base word in parentheses at the end of the sentence.
+- The `givenWord` must be the base form (root) provided in the parentheses (e.g., CREATE, BEAUTY, NATION).
+- The `correctAnswer` must be the grammatically correct form of the `givenWord` to fit the sentence.
+- The `acceptableAnswers` array should include the correct form, and pay close attention to plural forms or specific verb tenses if the context requires them.
+- Explain the grammatical reason for the transformation (e.g., changing a verb to an adjective to modify a noun).
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
@@ -383,27 +462,32 @@ Return JSON:
       ""givenWord"": ""CREATE"",
       ""correctAnswer"": ""creative"",
       ""acceptableAnswers"": [""creative""],
-      ""explanation"": ""We need an adjective to modify 'student'. CREATE → creative""
+      ""explanation"": ""In this sentence, an adjective is needed to modify the noun 'student'. The adjective form of the verb 'create' is 'creative'.""
     }}
   ]
 }}",
 
-            "paragraph_writing" => $@"Generate a paragraph writing prompt at Grade 8 level.
-{unitContext}
+            "paragraph_writing" => $@"Generate a paragraph writing prompt for Grade 8 English students.
+Context: {unitContext}
 
-Create a writing topic suitable for Grade 8 students (80-100 words expected).
-Include helpful hints and a sample answer for grading reference.
+Requirements:
+- Create a writing topic that is relevant to the unit context and suitable for the 14-year-old level.
+- The `topic` should clearly state the required word count (80-100 words).
+- The `hints` array should provide 4-5 helpful ideas or key vocabulary/phrases to guide the student.
+- The `sampleAnswer` MUST be a high-quality paragraph that strictly adheres to the 80-100 word limit to serve as a perfect reference.
+- Maintain the provided `rubric` structure for consistent grading.
+- Output ONLY raw, valid JSON. Do not include markdown code blocks, tags, or any conversational text.
 
 Return JSON:
 {{
-  ""topic"": ""Write a paragraph (80-100 words) about the benefits of recycling"",
+  ""topic"": ""Write a paragraph (80-100 words) about the benefits of recycling."",
   ""hints"": [""reduce waste"", ""save energy"", ""protect the environment"", ""reuse materials""],
   ""wordCount"": {{ ""min"": 80, ""max"": 100 }},
-  ""sampleAnswer"": ""Recycling is one of the most effective ways to protect our environment..."",
+  ""sampleAnswer"": ""Recycling is one of the most effective ways to protect our environment. First, it helps to reduce the amount of waste sent to landfills. Second, recycling saves energy because manufacturing products from recycled materials uses less power than using raw resources. Finally, it helps protect natural habitats by decreasing the need for mining and logging. In conclusion, every small effort in recycling contributes to a greener and cleaner planet for our future generations."",
   ""rubric"": {{
     ""content"": {{ ""maxScore"": 3, ""description"": ""Relevant ideas, clear topic sentence"" }},
     ""language"": {{ ""maxScore"": 3, ""description"": ""Grammar, vocabulary, spelling accuracy"" }},
-    ""organization"": {{ ""maxScore"": 2, ""description"": ""Logical flow, coherence"" }},
+    ""organization"": {{ ""maxScore"": 2, ""description"": ""Logical flow, use of connecting words"" }},
     ""mechanics"": {{ ""maxScore"": 2, ""description"": ""Punctuation, capitalization"" }}
   }}
 }}",

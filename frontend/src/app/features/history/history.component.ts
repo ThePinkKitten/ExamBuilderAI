@@ -62,7 +62,9 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
                   @if (actionLoading() === item.exerciseId) {
                     <mat-spinner diameter="20"></mat-spinner>
                   } @else {
-                    <mat-icon>replay</mat-icon> Re-answer
+                    <ng-container>
+                      <mat-icon>replay</mat-icon> Re-answer
+                    </ng-container>
                   }
                 </button>
               </div>
@@ -84,6 +86,9 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
   styles: [`
     .page-header {
       margin-bottom: 32px;
+      padding-left: 48px; // Room for the floating toggle button
+      text-align: left;
+      
       h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
       p { color: var(--text-secondary); font-size: 15px; }
     }
@@ -104,7 +109,10 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
       display: flex;
       align-items: center;
       gap: 20px;
-      padding: 20px;
+      padding: 24px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
       animation: fadeInUp 0.5s ease-out both;
 
       @media (max-width: 600px) {
@@ -117,9 +125,10 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
       flex: 1;
 
       h3 {
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 17px;
+        font-weight: 700;
         margin-bottom: 8px;
+        color: #333;
       }
     }
 
@@ -132,9 +141,10 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
     .meta-item {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       font-size: 13px;
       color: var(--text-muted);
+      font-weight: 500;
 
       mat-icon {
         font-size: 16px;
@@ -144,15 +154,16 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
     }
 
     .score-badge {
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 20px;
       font-size: 14px;
-      font-weight: 600;
-      background: rgba(255,255,255,0.1);
+      font-weight: 700;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
 
-      &.score-high { color: var(--success); background: rgba(16, 185, 129, 0.1); }
-      &.score-medium { color: var(--warning); background: rgba(245, 158, 11, 0.1); }
-      &.score-low { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+      &.score-high { color: var(--success); border-color: rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.05); }
+      &.score-medium { color: var(--warning); border-color: rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05); }
+      &.score-low { color: var(--danger); border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.05); }
       &.incomplete { color: var(--text-muted); }
     }
 
@@ -161,9 +172,17 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
       gap: 12px;
     }
 
+    .accent-btn {
+      box-shadow: none !important;
+      border-radius: 12px !important;
+    }
+
     .empty-state {
       text-align: center;
       padding: 64px 24px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
 
       mat-icon {
         font-size: 64px;
@@ -176,6 +195,7 @@ import { ExerciseHistoryItem } from '../../shared/models/api.models';
 
       h3 {
         font-size: 20px;
+        font-weight: 700;
         margin-bottom: 8px;
       }
 

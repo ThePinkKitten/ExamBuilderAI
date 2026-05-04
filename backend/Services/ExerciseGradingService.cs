@@ -9,13 +9,17 @@ public class ExerciseGradingService
 {
     private readonly AppDbContext _db;
     private readonly OpenRouterService _openRouter;
+    private readonly GeminiService _gemini;
     private readonly ILogger<ExerciseGradingService> _logger;
+    private readonly IConfiguration _config;
 
-    public ExerciseGradingService(AppDbContext db, OpenRouterService openRouter, ILogger<ExerciseGradingService> logger)
+    public ExerciseGradingService(AppDbContext db, OpenRouterService openRouter, GeminiService gemini, ILogger<ExerciseGradingService> logger, IConfiguration config)
     {
         _db = db;
         _openRouter = openRouter;
+        _gemini = gemini;
         _logger = logger;
+        _config = config;
     }
 
     /// <summary>
@@ -239,10 +243,23 @@ Return JSON:
   ""feedback"": ""Detailed feedback for the student with specific suggestions for improvement""
 }}";
 
-        var result = await _openRouter.ChatCompletionJsonAsync(
-            "You are an English teacher grading Grade 8 student writing. Be encouraging but honest. Provide specific feedback.",
-            prompt
-        );
+        var provider = _config["AIProvider"] ?? "OpenRouter";
+        JsonDocument? result = null;
+
+        if (provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+        {
+            result = await _gemini.GenerateContentAsync(
+                "You are an English teacher grading Grade 8 student writing. Be encouraging but honest. Provide specific feedback.",
+                prompt
+            );
+        }
+        else
+        {
+            result = await _openRouter.ChatCompletionJsonAsync(
+                "You are an English teacher grading Grade 8 student writing. Be encouraging but honest. Provide specific feedback.",
+                prompt
+            );
+        }
 
         if (result == null)
             return (5, "Unable to grade automatically. Please ask your teacher to review.");

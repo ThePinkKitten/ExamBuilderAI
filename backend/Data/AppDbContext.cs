@@ -97,7 +97,8 @@ public class AppDbContext : DbContext
             new ExerciseSection { Id = 7, Code = "reading", Name = "Reading Comprehension", Description = "Read the passage. Decide True/False and choose the correct answer", Icon = "menu_book", DisplayOrder = 7 },
             new ExerciseSection { Id = 8, Code = "sentence_completion", Name = "Sentence Completion", Description = "Complete the sentence with the correct words", Icon = "edit_note", DisplayOrder = 8 },
             new ExerciseSection { Id = 9, Code = "word_form", Name = "Word Form", Description = "Use the correct form of the word given in each sentence", Icon = "text_rotation_none", DisplayOrder = 9 },
-            new ExerciseSection { Id = 10, Code = "paragraph_writing", Name = "Paragraph Writing", Description = "Write a paragraph on the given topic (80-100 words)", Icon = "draw", DisplayOrder = 10 }
+            new ExerciseSection { Id = 10, Code = "paragraph_writing", Name = "Paragraph Writing", Description = "Write a paragraph on the given topic (80-100 words)", Icon = "draw", DisplayOrder = 11 },
+            new ExerciseSection { Id = 11, Code = "ed_pronunciation", Name = "Pronunciation of -ed", Description = "Choose the word whose -ed part is pronounced differently from the others", Icon = "history_edu", DisplayOrder = 10 }
         );
     }
 
